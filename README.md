@@ -55,8 +55,9 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Install SFDX Scanner
+      - name: Install SFDX CLI and Scanner
         run: |
+          npm install sfdx-cli
           node_modules/sfdx-cli/bin/run plugins:install @salesforce/sfdx-scanner
       - name: Run SFDX Scanner - Report findings as comments
         uses: mitchspano/sfdx-scan-pull-request@v0.1
