@@ -57,16 +57,16 @@ function initialSetup() {
 }
 
 /**
- * @description Calculates the diff from the last commit and
+ * @description Calculates the diff for all files within the pull request and
  * populates a map of filePath -> Set of changed line numbers
  */
-function getDiffSinceLastCommit() {
-  console.log("Getting difference since Last commit...");
+function getDiffInPullRequest() {
+  console.log("Getting difference within the pull request...");
   execSync(
     `git diff origin/${this.pullRequest?.base?.ref}...origin/${this.pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
   );
   var files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
-  files.forEach(function (file) {
+  for (let file of files) {
     if (fs.existsSync(file.to)) {
       let changedLines = new Set();
       for (let chunk of file.chunks) {
@@ -78,7 +78,7 @@ function getDiffSinceLastCommit() {
       }
       this.filePathToChangedLines[file.to] = changedLines;
     }
-  });
+  }
 }
 
 /**
@@ -88,6 +88,10 @@ function getDiffSinceLastCommit() {
 async function recursivelyMoveFilesToTempFolder() {
   console.log("Recursively moving all files to the temp folder...");
   let filesWithChanges = Object.keys(this.filePathToChangedLines);
+  if (filesWithChanges.length == 0) {
+    console.log("No files applicable files identified in the difference...");
+    process.exit();
+  }
   for (let file of filesWithChanges) {
     await copy(file, path.join(TEMP_DIR_NAME, file), {
       overwrite: true,
@@ -182,15 +186,12 @@ function isInChangedLines(violation, relevantLines) {
 function translateViolationToComment(filePath, violation, engine) {
   let type = isHaltingViolation(violation, engine) ? ERROR : WARNING;
   if (type == ERROR) {
-    hasHaltingError = true;
+    this.hasHaltingError = true;
   }
   let endLine = violation.endLine
     ? parseInt(violation.endLine)
     : parseInt(violation.line);
   let startLine = parseInt(violation.line);
-  if (endLine == startLine) {
-    endLine++;
-  }
   return {
     commit_id: this.pullRequest?.head?.sha,
     path: filePath,
@@ -253,8 +254,8 @@ async function writeComments() {
       await octokit.request(method, comment);
     }
   }
-  if (hasHaltingError === true) {
-    core.setFailed("A halting error has been identified");
+  if (this.hasHaltingError === true) {
+    core.setFailed("A serious error has been identified");
   }
 }
 
@@ -263,7 +264,7 @@ async function writeComments() {
  */
 async function main() {
   initialSetup();
-  getDiffSinceLastCommit();
+  getDiffInPullRequest();
   await recursivelyMoveFilesToTempFolder();
   performStaticCodeAnalysisOnFilesInDiff();
   filterFindingsToDiffScope();
