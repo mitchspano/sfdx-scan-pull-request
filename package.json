@@ -3,7 +3,10 @@
     "@actions/core": "^1.9.0",
     "@actions/github": "^5.0.3",
     "@octokit/action": "^4.0.4",
+    "child_process": "^1.0.2",
+    "fs": "^0.0.1-security",
     "parse-diff": "^0.9.0",
+    "path": "^0.12.7",
     "recursive-copy": "^2.0.14",
     "sfdx-cli": "^7.161.0"
   }
