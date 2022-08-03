@@ -33,9 +33,10 @@ const WARNING = "Warning";
 filePathToChangedLines = {};
 filePathToComments = {};
 findings = [];
+inputs = {};
 hasHaltingError = false;
 pullRequest = {};
-userInput = {};
+scannerCliArgs = "";
 
 /**
  * @description Collects and verifies the inputs from the action context and metadata
@@ -43,30 +44,42 @@ userInput = {};
  */
 function initialSetup() {
   // TODO: validate inputs
-  this.userInput = {
+  const inputs = {
     severityThreshold: core.getInput("severity-threshold"),
+    strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
     category: core.getInput("category"),
     engine: core.getInput("engine"),
     eslintEnv: core.getInput("eslint-env"),
+    eslintConfig: core.getInput("eslintconfig"),
     pmdConfig: core.getInput("pmdconfig"),
     tsConfig: core.getInput("tsconfig"),
-    verbose: core.getInput("verbose"),
-    strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
   };
+
+  let category = inputs.category ? `--category=${inputs.category}` : "";
+  let engine = inputs.engine ? `--engine=${inputs.engine}` : "";
+  let eslintEnv = inputs.eslintEnv ? `--env=${inputs.eslintEnv}` : "";
+  let eslintConfig = inputs.eslintConfig
+    ? `--eslintconfig=${inputs.eslintConfig}`
+    : "";
+  let pmdConfig = inputs.pmdConfig ? `--pmdconfig=${inputs.pmdConfig}` : "";
+  let tsConfig = inputs.tsConfig ? `--tsconfig=${inputs.tsConfig}` : "";
+  this.scannerCliArgs = `${category} ${engine} ${eslintEnv} ${eslintConfig} ${pmdConfig} ${tsConfig}`;
+
+  this.inputs = inputs;
   this.pullRequest = github.context?.payload?.pull_request;
 }
 
 /**
- * @description Calculates the diff from the last commit and
+ * @description Calculates the diff for all files within the pull request and
  * populates a map of filePath -> Set of changed line numbers
  */
-function getDiffSinceLastCommit() {
-  console.log("Getting difference since Last commit...");
+function getDiffInPullRequest() {
+  console.log("Getting difference within the pull request...");
   execSync(
     `git diff origin/${this.pullRequest?.base?.ref}...origin/${this.pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
   );
-  var files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
-  files.forEach(function (file) {
+  const files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
+  for (let file of files) {
     if (fs.existsSync(file.to)) {
       let changedLines = new Set();
       for (let chunk of file.chunks) {
@@ -78,7 +91,7 @@ function getDiffSinceLastCommit() {
       }
       this.filePathToChangedLines[file.to] = changedLines;
     }
-  });
+  }
 }
 
 /**
@@ -105,14 +118,17 @@ function performStaticCodeAnalysisOnFilesInDiff() {
   console.log(
     "Performing static code analysis on all of the files in the difference..."
   );
-  // TODO: Implement additional attributes passed into scan command
   execSync(
-    `node_modules/sfdx-cli/bin/run scanner:run \
+    `node_modules/sfdx-cli/bin/run scanner:run ${this.scannerCliArgs} \
     --format json \
     --target "${TEMP_DIR_NAME}" \
     --outfile "${FINDINGS_OUTPUT}"`
   );
   let filePath = path.join(process.cwd(), FINDINGS_OUTPUT);
+  if (fs.existsSync(filePath) === false) {
+    console.log("No files applicable files identified in the difference...");
+    process.exit();
+  }
   this.findings = JSON.parse(fs.readFileSync(filePath));
   for (let finding of this.findings) {
     finding.fileName = finding.fileName.replace(
@@ -182,15 +198,12 @@ function isInChangedLines(violation, relevantLines) {
 function translateViolationToComment(filePath, violation, engine) {
   let type = isHaltingViolation(violation, engine) ? ERROR : WARNING;
   if (type == ERROR) {
-    hasHaltingError = true;
+    this.hasHaltingError = true;
   }
   let endLine = violation.endLine
     ? parseInt(violation.endLine)
     : parseInt(violation.line);
   let startLine = parseInt(violation.line);
-  if (endLine == startLine) {
-    endLine++;
-  }
   return {
     commit_id: this.pullRequest?.head?.sha,
     path: filePath,
@@ -214,12 +227,12 @@ function translateViolationToComment(filePath, violation, engine) {
  */
 function isHaltingViolation(violation, engine) {
   if (
-    this.userInput.severityThreshold &&
-    this.userInput.severityThreshold <= violation.severity
+    this.inputs.severityThreshold &&
+    this.inputs.severityThreshold <= violation.severity
   ) {
     return true;
   }
-  if (!this.userInput.strictlyEnforcedRules) {
+  if (!this.inputs.strictlyEnforcedRules) {
     return false;
   }
   let violationDetail = {
@@ -227,7 +240,7 @@ function isHaltingViolation(violation, engine) {
     category: violation.category,
     rule: violation.ruleName,
   };
-  for (let enforcedRule of JSON.parse(this.userInput.strictlyEnforcedRules)) {
+  for (let enforcedRule of JSON.parse(this.inputs.strictlyEnforcedRules)) {
     if (
       Object.entries(violationDetail).toString() ===
       Object.entries(enforcedRule).toString()
@@ -253,8 +266,8 @@ async function writeComments() {
       await octokit.request(method, comment);
     }
   }
-  if (hasHaltingError === true) {
-    core.setFailed("A halting error has been identified");
+  if (this.hasHaltingError === true) {
+    core.setFailed("A serious error has been identified");
   }
 }
 
@@ -263,7 +276,7 @@ async function writeComments() {
  */
 async function main() {
   initialSetup();
-  getDiffSinceLastCommit();
+  getDiffInPullRequest();
   await recursivelyMoveFilesToTempFolder();
   performStaticCodeAnalysisOnFilesInDiff();
   filterFindingsToDiffScope();

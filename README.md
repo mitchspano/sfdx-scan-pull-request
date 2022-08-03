@@ -14,8 +14,6 @@ Throws an error when violations of specific severity (or more severe) are detect
 
 A JSON string which contains the rules which will be strictly enforced regardless of their priority. Enforced rules are identified by their engine, category, and rule name.
 
-<!--
-TODO : Implement additional attributes passed into scan command
 ## `category`
 
 Categor(ies) of rules to run.
@@ -24,9 +22,13 @@ Categor(ies) of rules to run.
 
 Engine(s) to run.
 
- ## `eslint-env`
+## `eslint-env`
 
 JSON-formatted string, overrides ESLint's default environment variables.
+
+## `eslintconfig`
+
+Location of eslintrc config to customize eslint engine.
 
 ## `pmdconfig`
 
@@ -35,10 +37,6 @@ Location of PMD rule reference XML file to customize rule selection
 ## `tsconfig`
 
 Location of tsconfig.json file
-
-## `verbose`
-
-Emit additional command output to stdout -->
 
 ## Example usage
 

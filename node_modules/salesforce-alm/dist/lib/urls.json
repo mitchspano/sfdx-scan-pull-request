@@ -1,0 +1,4 @@
+{
+    "sandbox": "https://test.salesforce.com",
+    "production": "https://login.salesforce.com"
+}

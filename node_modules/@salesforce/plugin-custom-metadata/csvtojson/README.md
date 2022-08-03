@@ -1,0 +1,1 @@
+Brought in from https://github.com/Keyang/node-csvtojson to fix https://github.com/Keyang/node-csvtojson/issues/393. Can be removed when that issue is fixed. 

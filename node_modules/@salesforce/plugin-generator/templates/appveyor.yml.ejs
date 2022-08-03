@@ -1,0 +1,18 @@
+environment:
+  nodejs_version: "10"
+cache:
+  - '%LOCALAPPDATA%\Yarn -> appveyor.yml'
+  - node_modules -> yarn.lock
+
+install:
+  - ps: Install-Product node $env:nodejs_version x64
+  - yarn
+
+build: off
+
+build_script:
+  - ps: Write-Host “Prepack plugin”
+  - yarn prepack
+
+test_script:
+  - yarn test
