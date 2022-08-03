@@ -33,9 +33,10 @@ const WARNING = "Warning";
 filePathToChangedLines = {};
 filePathToComments = {};
 findings = [];
+inputs = {};
 hasHaltingError = false;
 pullRequest = {};
-userInput = {};
+scannerCliArgs = "";
 
 /**
  * @description Collects and verifies the inputs from the action context and metadata
@@ -43,16 +44,28 @@ userInput = {};
  */
 function initialSetup() {
   // TODO: validate inputs
-  this.userInput = {
+  const inputs = {
     severityThreshold: core.getInput("severity-threshold"),
+    strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
     category: core.getInput("category"),
     engine: core.getInput("engine"),
     eslintEnv: core.getInput("eslint-env"),
+    eslintConfig: core.getInput("eslintconfig"),
     pmdConfig: core.getInput("pmdconfig"),
     tsConfig: core.getInput("tsconfig"),
-    verbose: core.getInput("verbose"),
-    strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
   };
+
+  let category = inputs.category ? `--category=${inputs.category}` : "";
+  let engine = inputs.engine ? `--engine=${inputs.engine}` : "";
+  let eslintEnv = inputs.eslintEnv ? `--env=${inputs.eslintEnv}` : "";
+  let eslintConfig = inputs.eslintConfig
+    ? `--eslintconfig=${inputs.eslintConfig}`
+    : "";
+  let pmdConfig = inputs.pmdConfig ? `--pmdconfig=${inputs.pmdConfig}` : "";
+  let tsConfig = inputs.tsConfig ? `--tsconfig=${inputs.tsConfig}` : "";
+  this.scannerCliArgs = `${category} ${engine} ${eslintEnv} ${eslintConfig} ${pmdConfig} ${tsConfig}`;
+
+  this.inputs = inputs;
   this.pullRequest = github.context?.payload?.pull_request;
 }
 
@@ -65,7 +78,7 @@ function getDiffInPullRequest() {
   execSync(
     `git diff origin/${this.pullRequest?.base?.ref}...origin/${this.pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
   );
-  var files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
+  const files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
   for (let file of files) {
     if (fs.existsSync(file.to)) {
       let changedLines = new Set();
@@ -109,9 +122,8 @@ function performStaticCodeAnalysisOnFilesInDiff() {
   console.log(
     "Performing static code analysis on all of the files in the difference..."
   );
-  // TODO: Implement additional attributes passed into scan command
   execSync(
-    `node_modules/sfdx-cli/bin/run scanner:run \
+    `node_modules/sfdx-cli/bin/run scanner:run ${this.scannerCliArgs} \
     --format json \
     --target "${TEMP_DIR_NAME}" \
     --outfile "${FINDINGS_OUTPUT}"`
@@ -215,12 +227,12 @@ function translateViolationToComment(filePath, violation, engine) {
  */
 function isHaltingViolation(violation, engine) {
   if (
-    this.userInput.severityThreshold &&
-    this.userInput.severityThreshold <= violation.severity
+    this.inputs.severityThreshold &&
+    this.inputs.severityThreshold <= violation.severity
   ) {
     return true;
   }
-  if (!this.userInput.strictlyEnforcedRules) {
+  if (!this.inputs.strictlyEnforcedRules) {
     return false;
   }
   let violationDetail = {
@@ -228,7 +240,7 @@ function isHaltingViolation(violation, engine) {
     category: violation.category,
     rule: violation.ruleName,
   };
-  for (let enforcedRule of JSON.parse(this.userInput.strictlyEnforcedRules)) {
+  for (let enforcedRule of JSON.parse(this.inputs.strictlyEnforcedRules)) {
     if (
       Object.entries(violationDetail).toString() ===
       Object.entries(enforcedRule).toString()
