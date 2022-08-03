@@ -101,10 +101,6 @@ function getDiffInPullRequest() {
 async function recursivelyMoveFilesToTempFolder() {
   console.log("Recursively moving all files to the temp folder...");
   let filesWithChanges = Object.keys(this.filePathToChangedLines);
-  if (filesWithChanges.length == 0) {
-    console.log("No files applicable files identified in the difference...");
-    process.exit();
-  }
   for (let file of filesWithChanges) {
     await copy(file, path.join(TEMP_DIR_NAME, file), {
       overwrite: true,
@@ -129,6 +125,10 @@ function performStaticCodeAnalysisOnFilesInDiff() {
     --outfile "${FINDINGS_OUTPUT}"`
   );
   let filePath = path.join(process.cwd(), FINDINGS_OUTPUT);
+  if (fs.existsSync(filePath) === false) {
+    console.log("No files applicable files identified in the difference...");
+    process.exit();
+  }
   this.findings = JSON.parse(fs.readFileSync(filePath));
   for (let finding of this.findings) {
     finding.fileName = finding.fileName.replace(
