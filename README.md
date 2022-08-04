@@ -58,8 +58,9 @@ jobs:
           npm install sfdx-cli
           node_modules/sfdx-cli/bin/run plugins:install @salesforce/sfdx-scanner
       - name: Run SFDX Scanner - Report findings as comments
-        uses: mitchspano/sfdx-scan-pull-request@v0.1.1
+        uses: mitchspano/sfdx-scan-pull-request@v0.1.2
         with:
+          pmdconfig: ruleset.xml
           severity-threshold: 4
           strictly-enforced-rules: '[{ "engine": "pmd", "category": "Performance", "rule": "AvoidDebugStatements" }]'
         env:
