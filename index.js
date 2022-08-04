@@ -204,6 +204,9 @@ function translateViolationToComment(filePath, violation, engine) {
     ? parseInt(violation.endLine)
     : parseInt(violation.line);
   let startLine = parseInt(violation.line);
+  if (endLine == startLine) {
+    endLine++;
+  }
   return {
     commit_id: this.pullRequest?.head?.sha,
     path: filePath,
