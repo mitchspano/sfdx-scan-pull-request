@@ -6,14 +6,6 @@ Runs sfdx-scanner on a pull request and generates in-line comments with the find
 
 ## Inputs
 
-## `severity-threshold`
-
-Throws an error when violations of specific severity (or more severe) are detected.
-
-## `strictly-enforced-rules`
-
-A JSON string which contains the rules which will be strictly enforced regardless of their priority. Enforced rules are identified by their engine, category, and rule name.
-
 ## `category`
 
 Categor(ies) of rules to run.
@@ -34,6 +26,14 @@ Location of eslintrc config to customize eslint engine.
 
 Location of PMD rule reference XML file to customize rule selection
 
+## `severity-threshold`
+
+Throws an error when violations of specific severity (or more severe) are detected.
+
+## `strictly-enforced-rules`
+
+A JSON string which contains the rules which will be strictly enforced regardless of their priority. Enforced rules are identified by their engine, category, and rule name.
+
 ## `tsconfig`
 
 Location of tsconfig.json file
@@ -44,7 +44,7 @@ Location of tsconfig.json file
 name: Static Analysis
 on:
   pull_request:
-    types: [opened, reopened, edited]
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
 jobs:
   analyze:
@@ -58,7 +58,7 @@ jobs:
           npm install sfdx-cli
           node_modules/sfdx-cli/bin/run plugins:install @salesforce/sfdx-scanner
       - name: Run SFDX Scanner - Report findings as comments
-        uses: mitchspano/sfdx-scan-pull-request@v0.1
+        uses: mitchspano/sfdx-scan-pull-request@v0.1.1
         with:
           severity-threshold: 4
           strictly-enforced-rules: '[{ "engine": "pmd", "category": "Performance", "rule": "AvoidDebugStatements" }]'
