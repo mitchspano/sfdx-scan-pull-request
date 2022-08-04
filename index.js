@@ -55,14 +55,14 @@ function initialSetup() {
     tsConfig: core.getInput("tsconfig"),
   };
 
-  let category = inputs.category ? `--category=${inputs.category}` : "";
-  let engine = inputs.engine ? `--engine=${inputs.engine}` : "";
-  let eslintEnv = inputs.eslintEnv ? `--env=${inputs.eslintEnv}` : "";
+  let category = inputs.category ? `--category="${inputs.category}"` : "";
+  let engine = inputs.engine ? `--engine="${inputs.engine}"` : "";
+  let eslintEnv = inputs.eslintEnv ? `--env="${inputs.eslintEnv}"` : "";
   let eslintConfig = inputs.eslintConfig
-    ? `--eslintconfig=${inputs.eslintConfig}`
+    ? `--eslintconfig="${inputs.eslintConfig}"`
     : "";
-  let pmdConfig = inputs.pmdConfig ? `--pmdconfig=${inputs.pmdConfig}` : "";
-  let tsConfig = inputs.tsConfig ? `--tsconfig=${inputs.tsConfig}` : "";
+  let pmdConfig = inputs.pmdConfig ? `--pmdconfig="${inputs.pmdConfig}"` : "";
+  let tsConfig = inputs.tsConfig ? `--tsconfig="${inputs.tsConfig}"` : "";
   this.scannerCliArgs = `${category} ${engine} ${eslintEnv} ${eslintConfig} ${pmdConfig} ${tsConfig}`;
 
   this.inputs = inputs;
