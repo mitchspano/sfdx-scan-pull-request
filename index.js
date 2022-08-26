@@ -165,27 +165,25 @@ function filterFindingsToDiffScope() {
 }
 
 /**
- * @description Determines if a found violation contains a line
- * which has changed
+ * @description Determines if all lines within a violation have changed
  * @param {Violation} violation Violation from the sfdx scanner
  * @param {Set<Integer>} relevantLines Lines in the file which have changed
  * @returns Boolean
  */
 function isInChangedLines(violation, relevantLines) {
-  if (violation.endLine) {
-    for (
-      let i = parseInt(violation.line);
-      i <= parseInt(violation.endLine);
-      i++
-    ) {
-      if (relevantLines && relevantLines.has(i)) {
-        return true;
-      }
-    }
-  } else if (relevantLines && relevantLines.has(parseInt(violation.line))) {
-    return true;
+  if (!violation.endLine) {
+    return relevantLines && relevantLines.has(parseInt(violation.line));
   }
-  return false;
+  for (
+    let i = parseInt(violation.line);
+    i <= parseInt(violation.endLine);
+    i++
+  ) {
+    if (!relevantLines || relevantLines.has(i) == false) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
