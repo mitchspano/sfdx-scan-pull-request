@@ -3,7 +3,7 @@
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
-	https://www.apache.org/licenses/LICENSE-2.0
+	 https://www.apache.org/licenses/LICENSE-2.0
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -67,6 +67,18 @@ function initialSetup() {
 
   this.inputs = inputs;
   this.pullRequest = github.context?.payload?.pull_request;
+}
+
+/**
+ * @description Validate that the action is called from within the scope of a pull request
+ */
+function validatePullRequestContext() {
+  console.log("Validating that this action was invoked from a pull request");
+  if (!this.pullRequest) {
+    core.setFailed(
+      "This action is only applicable when invoked in the context of a pull request."
+    );
+  }
 }
 
 /**
@@ -277,6 +289,7 @@ async function writeComments() {
  */
 async function main() {
   initialSetup();
+  validatePullRequestContext();
   getDiffInPullRequest();
   await recursivelyMoveFilesToTempFolder();
   performStaticCodeAnalysisOnFilesInDiff();
