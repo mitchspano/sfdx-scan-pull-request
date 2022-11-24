@@ -73,11 +73,12 @@ function initialSetup() {
  * @description Validate that the action is called from within the scope of a pull request
  */
 function validatePullRequestContext() {
-  console.log("Validating that this action was invoked from a pull request");
+  console.log("Validating that this action was invoked from a pull request...");
   if (!this.pullRequest) {
     core.setFailed(
       "This action is only applicable when invoked in the context of a pull request."
     );
+    process.exit();
   }
 }
 
