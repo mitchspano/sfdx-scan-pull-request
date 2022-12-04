@@ -89,7 +89,7 @@ function validatePullRequestContext() {
 function getDiffInPullRequest() {
   console.log("Getting difference within the pull request...");
   execSync(
-    `git remote add -f destination ${this.pullRequest.base.repo.git_url}`
+    `git remote add -f destination ${this.pullRequest.base.repo.clone_url}`
   );
   execSync(`git remote update`);
   execSync(
