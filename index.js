@@ -89,7 +89,11 @@ function validatePullRequestContext() {
 function getDiffInPullRequest() {
   console.log("Getting difference within the pull request...");
   execSync(
-    `git diff origin/${this.pullRequest?.base?.ref}...origin/${this.pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
+    `git remote add -f destination ${this.pullRequest.base.repo.clone_url}`
+  );
+  execSync(`git remote update`);
+  execSync(
+    `git diff destination/${this.pullRequest?.base?.ref}...origin/${this.pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
   );
   const files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
   for (let file of files) {
