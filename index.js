@@ -11,8 +11,8 @@
    limitations under the License.
  */
 
-const { execSync } = require("child_process");
-const { Octokit } = require("@octokit/action");
+const {execSync} = require("child_process");
+const {Octokit} = require("@octokit/action");
 const copy = require("recursive-copy");
 const core = require("@actions/core");
 const fs = require("fs");
@@ -32,6 +32,7 @@ const WARNING = "Warning";
 
 filePathToChangedLines = {};
 filePathToComments = {};
+existingComments = [];
 findings = [];
 inputs = {};
 hasHaltingError = false;
@@ -67,6 +68,14 @@ function initialSetup() {
 
   this.inputs = inputs;
   this.pullRequest = github.context?.payload?.pull_request;
+}
+
+function getApi() {
+  const octokit = new Octokit();
+  const owner = this.pullRequest?.base?.repo?.owner?.login;
+  const repo = this.pullRequest?.base?.repo?.name;
+  const prNumber = this.pullRequest?.number;
+  return {octokit, owner, prNumber, repo}
 }
 
 /**
@@ -125,6 +134,13 @@ async function recursivelyMoveFilesToTempFolder() {
       core.setFailed("Copy failed: " + error);
     });
   }
+}
+
+async function getExistingComments() {
+  const {octokit, owner, prNumber, repo} = getApi();
+
+  const method = `GET /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
+  this.existingComments = await octokit.paginate(method);
 }
 
 /**
@@ -275,18 +291,27 @@ function isHaltingViolation(violation, engine) {
  */
 async function writeComments() {
   console.log("Writing comments using GitHub REST API...");
-  const octokit = new Octokit();
-  const owner = this.pullRequest?.base?.repo?.owner?.login;
-  const repo = this.pullRequest?.base?.repo?.name;
+  const {octokit, owner, prNumber, repo} = getApi();
   for (let file in this.filePathToComments) {
     for (let comment of this.filePathToComments[file]) {
-      const method = `POST /repos/${owner}/${repo}/pulls/${this.pullRequest?.number}/comments`;
-      await octokit.request(method, comment);
+      // TODO: Add in resolving comments when the issue has been resolved?
+      const existingComment = this.existingComments.find(existingComment => matchComment(comment, existingComment));
+      if (!existingComment) {
+        const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
+        await octokit.request(method, comment);
+      } else {
+        console.log('Skipping existing comment...', existingComment);
+      }
+
     }
   }
   if (this.hasHaltingError === true) {
     core.setFailed("A serious error has been identified");
   }
+}
+
+function matchComment(commentA, commentB) {
+  return commentA.line === commentB.line && commentA.body === commentB.body;
 }
 
 /**
@@ -298,6 +323,7 @@ async function main() {
   getDiffInPullRequest();
   await recursivelyMoveFilesToTempFolder();
   performStaticCodeAnalysisOnFilesInDiff();
+  await getExistingComments();
   filterFindingsToDiffScope();
   writeComments();
 }
