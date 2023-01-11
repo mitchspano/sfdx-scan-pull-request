@@ -11,8 +11,8 @@
    limitations under the License.
  */
 
-const {execSync} = require("child_process");
-const {Octokit} = require("@octokit/action");
+const { execSync } = require("child_process");
+const { Octokit } = require("@octokit/action");
 const copy = require("recursive-copy");
 const core = require("@actions/core");
 const fs = require("fs");
@@ -70,12 +70,12 @@ function initialSetup() {
   this.pullRequest = github.context?.payload?.pull_request;
 }
 
-function getApi() {
+function getGithubRestApiClient() {
   const octokit = new Octokit();
   const owner = this.pullRequest?.base?.repo?.owner?.login;
   const repo = this.pullRequest?.base?.repo?.name;
   const prNumber = this.pullRequest?.number;
-  return {octokit, owner, prNumber, repo}
+  return { octokit, owner, prNumber, repo };
 }
 
 /**
@@ -137,7 +137,8 @@ async function recursivelyMoveFilesToTempFolder() {
 }
 
 async function getExistingComments() {
-  const {octokit, owner, prNumber, repo} = getApi();
+  console.log("Getting existing comments using GitHub REST API...");
+  const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
 
   const method = `GET /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
   this.existingComments = await octokit.paginate(method);
@@ -291,22 +292,19 @@ function isHaltingViolation(violation, engine) {
  */
 async function writeComments() {
   console.log("Writing comments using GitHub REST API...");
-  const {octokit, owner, prNumber, repo} = getApi();
+  const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
   for (let file in this.filePathToComments) {
     for (let comment of this.filePathToComments[file]) {
       // TODO: Add in resolving comments when the issue has been resolved?
-      const existingComment = this.existingComments.find(existingComment => matchComment(comment, existingComment));
+      const existingComment = this.existingComments.find((existingComment) =>
+        matchComment(comment, existingComment)
+      );
       if (!existingComment) {
         const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
         await octokit.request(method, comment);
       } else {
-        console.log('Skipping existing comment...', {
-          line: existingComment.line,
-          body: existingComment.body,
-          path: existingComment.path
-        });
+        console.log(`Skipping existing comment ${existingComment.url}`);
       }
-
     }
   }
   if (this.hasHaltingError === true) {
@@ -315,9 +313,11 @@ async function writeComments() {
 }
 
 function matchComment(commentA, commentB) {
-  return commentA.line === commentB.line &&
+  return (
+    commentA.line === commentB.line &&
     commentA.body === commentB.body &&
-    commentA.path === commentB.path;
+    commentA.path === commentB.path
+  );
 }
 
 /**
