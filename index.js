@@ -300,7 +300,11 @@ async function writeComments() {
         const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
         await octokit.request(method, comment);
       } else {
-        console.log('Skipping existing comment...', existingComment);
+        console.log('Skipping existing comment...', {
+          line: existingComment.line,
+          body: existingComment.body,
+          path: existingComment.path
+        });
       }
 
     }
@@ -311,7 +315,9 @@ async function writeComments() {
 }
 
 function matchComment(commentA, commentB) {
-  return commentA.line === commentB.line && commentA.body === commentB.body;
+  return commentA.line === commentB.line &&
+    commentA.body === commentB.body &&
+    commentA.path === commentB.path;
 }
 
 /**
