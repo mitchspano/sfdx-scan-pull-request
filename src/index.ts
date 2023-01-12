@@ -11,33 +11,81 @@
    limitations under the License.
  */
 
-const { execSync } = require("child_process");
-const { Octokit } = require("@octokit/action");
-const copy = require("recursive-copy");
-const core = require("@actions/core");
-const fs = require("fs");
-const github = require("@actions/github");
-const parse = require("parse-diff");
-const path = require("path");
+import { execSync } from "child_process";
+import { Octokit } from "@octokit/action";
+import copy from "recursive-copy";
+import core from "@actions/core";
+import fs from "fs";
+import github, { context } from "@actions/github";
+import parse, { AddChange, ChangeType, DeleteChange } from "parse-diff";
+import path from "path";
+
+type PluginInputs = {
+  severityThreshold: number;
+  strictlyEnforcedRules: string;
+};
+
+type ScannerFlags = {
+  category: string;
+  engine: string;
+  env: string;
+  eslintconfig: string;
+  pmdconfig: string;
+  tsConfig: string;
+};
+
+type ScannerFinding = {
+  fileName: string;
+  engine: string;
+  violations: ScannerViolation[];
+};
+
+type ScannerViolation = UrlObject & {
+  category: string;
+  endLine: string;
+  line: string;
+  message: string;
+  ruleName: string;
+  severity: number;
+};
+
+type ScannerViolationType = "Error" | "Warning";
+
+type GithubComment = UrlObject & {
+  commit_id: string;
+  path: string;
+  start_line: number;
+  start_side: GithubCommentSide;
+  side: GithubCommentSide;
+  line: number;
+  body: string;
+};
+
+type UrlObject = {
+  url?: string;
+};
+
+type GithubCommentSide = "RIGHT";
 
 const COMMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
 | --- | --- | --- | --- | --- |`;
 const DIFF_OUTPUT = "diffBetweenCurrentAndParentBranch.txt";
-const ERROR = "Error";
 const FINDINGS_OUTPUT = "sfdx-scanner-findings.json";
-const RIGHT = "RIGHT";
 const TEMP_DIR_NAME = "temporary";
-const TYPES_OF_INTEREST = new Set().add("add").add("delete");
-const WARNING = "Warning";
+const TYPES_OF_INTEREST = new Set<ChangeType>().add("add").add("del");
 
-filePathToChangedLines = {};
-filePathToComments = {};
-existingComments = [];
-findings = [];
-inputs = {};
-hasHaltingError = false;
-pullRequest = {};
-scannerCliArgs = "";
+const filePathToChangedLines = {} as { [key in string]: Set<number> };
+const filePathToComments = {} as { [key in string]: GithubComment[] };
+const existingComments = [] as GithubComment[];
+const inputs = {
+  severityThreshold: 0,
+  strictlyEnforcedRules: "",
+} as PluginInputs;
+
+let findings = [] as ScannerFinding[];
+let pullRequest = {} as typeof context.payload.pull_request;
+let hasHaltingError = false;
+let scannerCliArgs = "";
 
 /**
  * @description Collects and verifies the inputs from the action context and metadata
@@ -51,26 +99,24 @@ function initialSetup() {
     eslintconfig: core.getInput("eslintconfig"),
     pmdconfig: core.getInput("pmdconfig"),
     tsConfig: core.getInput("tsconfig"),
-  };
+  } as ScannerFlags;
 
-  this.scannerCliArgs = Object.keys(scannerFlags)
+  scannerCliArgs = (Object.keys(scannerFlags) as Array<keyof ScannerFlags>)
     .map(
       (key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}"` : ""}`
     )
     .join(" ");
   // TODO: validate inputs
-  this.inputs = {
-    severityThreshold: core.getInput("severity-threshold"),
-    strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
-  };
-  this.pullRequest = github.context?.payload?.pull_request;
+  inputs.severityThreshold = parseInt(core.getInput("severity-threshold")) || 5;
+  inputs.strictlyEnforcedRules = core.getInput("strictly-enforced-rules");
+  pullRequest = github.context.payload.pull_request;
 }
 
 function getGithubRestApiClient() {
   const octokit = new Octokit();
-  const owner = this.pullRequest?.base?.repo?.owner?.login;
-  const repo = this.pullRequest?.base?.repo?.name;
-  const prNumber = this.pullRequest?.number;
+  const owner = pullRequest?.base?.repo?.owner?.login;
+  const repo = pullRequest?.base?.repo?.name;
+  const prNumber = pullRequest?.number;
   return { octokit, owner, prNumber, repo };
 }
 
@@ -79,7 +125,7 @@ function getGithubRestApiClient() {
  */
 function validatePullRequestContext() {
   console.log("Validating that this action was invoked from a pull request...");
-  if (!this.pullRequest) {
+  if (!pullRequest) {
     core.setFailed(
       "This action is only applicable when invoked in the context of a pull request."
     );
@@ -94,24 +140,26 @@ function validatePullRequestContext() {
 function getDiffInPullRequest() {
   console.log("Getting difference within the pull request...");
   execSync(
-    `git remote add -f destination ${this.pullRequest.base.repo.clone_url}`
+    `git remote add -f destination ${pullRequest?.base?.repo?.clone_url}`
   );
   execSync(`git remote update`);
   execSync(
-    `git diff destination/${this.pullRequest?.base?.ref}...origin/${this.pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
+    `git diff destination/${pullRequest?.base?.ref}...origin/${pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
   );
   const files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
   for (let file of files) {
-    if (fs.existsSync(file.to)) {
-      let changedLines = new Set();
+    if (file.to && fs.existsSync(file.to)) {
+      let changedLines = new Set<number>();
       for (let chunk of file.chunks) {
         for (let change of chunk.changes) {
           if (TYPES_OF_INTEREST.has(change.type)) {
-            changedLines.add(change.ln);
+            changedLines.add(
+              ((change as AddChange) || (change as DeleteChange)).ln
+            );
           }
         }
       }
-      this.filePathToChangedLines[file.to] = changedLines;
+      filePathToChangedLines[file.to] = changedLines;
     }
   }
 }
@@ -122,7 +170,7 @@ function getDiffInPullRequest() {
  */
 async function recursivelyMoveFilesToTempFolder() {
   console.log("Recursively moving all files to the temp folder...");
-  const filesWithChanges = Object.keys(this.filePathToChangedLines);
+  const filesWithChanges = Object.keys(filePathToChangedLines);
   for (let file of filesWithChanges) {
     await copy(file, path.join(TEMP_DIR_NAME, file), {
       overwrite: true,
@@ -137,7 +185,9 @@ async function getExistingComments() {
   const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
 
   const method = `GET /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
-  this.existingComments = await octokit.paginate(method);
+  existingComments.push(
+    ...((await octokit.paginate(method)) as GithubComment[])
+  );
 }
 
 /**
@@ -149,7 +199,7 @@ function performStaticCodeAnalysisOnFilesInDiff() {
     "Performing static code analysis on all of the files in the difference..."
   );
   execSync(
-    `node_modules/sfdx-cli/bin/run scanner:run ${this.scannerCliArgs} \
+    `node_modules/sfdx-cli/bin/run scanner:run ${scannerCliArgs} \
     --format json \
     --target "${TEMP_DIR_NAME}" \
     --outfile "${FINDINGS_OUTPUT}"`
@@ -159,8 +209,10 @@ function performStaticCodeAnalysisOnFilesInDiff() {
     console.log("No files applicable files identified in the difference...");
     process.exit();
   }
-  this.findings = JSON.parse(fs.readFileSync(filePath));
-  for (let finding of this.findings) {
+  findings = JSON.parse(
+    fs.readFileSync(filePath) as unknown as string
+  ) as ScannerFinding[];
+  for (let finding of findings) {
     finding.fileName = finding.fileName.replace(
       path.join(process.cwd(), TEMP_DIR_NAME),
       process.cwd()
@@ -178,13 +230,13 @@ function filterFindingsToDiffScope() {
   console.log(
     "Filtering the findings to just the lines which are part of the pull request..."
   );
-  for (let finding of this.findings) {
+  for (let finding of findings) {
     const filePath = finding.fileName.replace(process.cwd() + "/", "");
-    relevantLines = filePathToChangedLines[filePath];
+    const relevantLines = filePathToChangedLines[filePath];
     for (let violation of finding.violations) {
       if (isInChangedLines(violation, relevantLines)) {
         if (!filePathToComments[filePath]) {
-          filePathToComments[filePath] = [];
+          filePathToComments[filePath] = [] as GithubComment[];
         }
         filePathToComments[filePath].push(
           translateViolationToComment(filePath, violation, finding.engine)
@@ -200,7 +252,10 @@ function filterFindingsToDiffScope() {
  * @param {Set<Integer>} relevantLines Lines in the file which have changed
  * @returns Boolean
  */
-function isInChangedLines(violation, relevantLines) {
+function isInChangedLines(
+  violation: ScannerViolation,
+  relevantLines: Set<number>
+) {
   if (!violation.endLine) {
     return relevantLines && relevantLines.has(parseInt(violation.line));
   }
@@ -223,10 +278,14 @@ function isInChangedLines(violation, relevantLines) {
  * @param {String} engine Engine from the sfdx scanner
  * @returns Comment
  */
-function translateViolationToComment(filePath, violation, engine) {
-  let type = isHaltingViolation(violation, engine) ? ERROR : WARNING;
-  if (type == ERROR) {
-    this.hasHaltingError = true;
+function translateViolationToComment(
+  filePath: string,
+  violation: ScannerViolation,
+  engine: string
+): GithubComment {
+  const type = getScannerViolationType(violation, engine);
+  if (type === "Error") {
+    hasHaltingError = true;
   }
   let endLine = violation.endLine
     ? parseInt(violation.endLine)
@@ -236,13 +295,12 @@ function translateViolationToComment(filePath, violation, engine) {
     endLine++;
   }
   return {
-    commit_id: this.pullRequest?.head?.sha,
+    commit_id: pullRequest?.head?.sha,
     path: filePath,
     start_line: startLine,
-    start_side: RIGHT,
-    side: RIGHT,
+    start_side: "RIGHT",
+    side: "RIGHT",
     line: endLine,
-    start_line: startLine,
     body: `${COMMMENT_HEADER}
 | ${engine} | ${violation.category} | ${violation.ruleName} | ${violation.severity} | ${type} |
 
@@ -256,30 +314,32 @@ function translateViolationToComment(filePath, violation, engine) {
  * @param {String} engine Engine from the sfdx scanner
  * @returns Boolean
  */
-function isHaltingViolation(violation, engine) {
-  if (
-    this.inputs.severityThreshold &&
-    this.inputs.severityThreshold <= violation.severity
-  ) {
-    return true;
+function getScannerViolationType(
+  violation: ScannerViolation,
+  engine: string
+): ScannerViolationType {
+  if (inputs.severityThreshold <= violation.severity) {
+    return "Error";
   }
-  if (!this.inputs.strictlyEnforcedRules) {
-    return false;
+  if (!inputs.strictlyEnforcedRules) {
+    return "Warning";
   }
   let violationDetail = {
     engine: engine,
     category: violation.category,
     rule: violation.ruleName,
   };
-  for (let enforcedRule of JSON.parse(this.inputs.strictlyEnforcedRules)) {
+  for (let enforcedRule of JSON.parse(inputs.strictlyEnforcedRules) as {
+    [key in string]: string;
+  }[]) {
     if (
       Object.entries(violationDetail).toString() ===
       Object.entries(enforcedRule).toString()
     ) {
-      return true;
+      return "Error";
     }
   }
-  return false;
+  return "Warning";
 }
 
 /**
@@ -289,11 +349,11 @@ function isHaltingViolation(violation, engine) {
 async function writeComments() {
   console.log("Writing comments using GitHub REST API...");
   const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
-  for (let file in this.filePathToComments) {
-    for (let comment of this.filePathToComments[file]) {
+  for (let file in filePathToComments) {
+    for (let comment of filePathToComments[file]) {
       // TODO: Add in resolving comments when the issue has been resolved?
-      const existingComment = this.existingComments.find((existingComment) =>
-        matchComment(comment, existingComment)
+      const existingComment = existingComments.find((existingComment) =>
+        matchComment(comment as GithubComment, existingComment)
       );
       if (!existingComment) {
         const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
@@ -303,12 +363,12 @@ async function writeComments() {
       }
     }
   }
-  if (this.hasHaltingError === true) {
+  if (hasHaltingError === true) {
     core.setFailed("A serious error has been identified");
   }
 }
 
-function matchComment(commentA, commentB) {
+function matchComment(commentA: GithubComment, commentB: GithubComment) {
   return (
     commentA.line === commentB.line &&
     commentA.body === commentB.body &&

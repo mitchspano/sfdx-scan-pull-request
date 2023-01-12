@@ -9,5 +9,13 @@
     "path": "^0.12.7",
     "recursive-copy": "^2.0.14",
     "sfdx-cli": "^7.161.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.0",
+    "@vercel/ncc": "^0.36.0",
+    "typescript": "^4.9.4"
+  },
+  "scripts": {
+    "build": "tsc"
   }
 }
