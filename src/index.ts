@@ -11,14 +11,16 @@
    limitations under the License.
  */
 
-import { execSync } from "child_process";
+import core from "@actions/core";
 import { Octokit } from "@octokit/action";
 import copy from "recursive-copy";
-import core from "@actions/core";
 import fs from "fs";
 import github, { context } from "@actions/github";
 import parse, { AddChange, ChangeType, DeleteChange } from "parse-diff";
 import path from "path";
+import { simpleGit } from "simple-git";
+
+import sfdxCli from "./sfdxCli";
 
 type PluginInputs = {
   severityThreshold: number;
@@ -66,26 +68,14 @@ type UrlObject = {
 };
 
 type GithubCommentSide = "RIGHT";
+type GithubPullRequest = typeof context.payload.pull_request | undefined;
 
 const COMMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
 | --- | --- | --- | --- | --- |`;
-const DIFF_OUTPUT = "diffBetweenCurrentAndParentBranch.txt";
 const FINDINGS_OUTPUT = "sfdx-scanner-findings.json";
 const TEMP_DIR_NAME = "temporary";
-const TYPES_OF_INTEREST = new Set<ChangeType>().add("add").add("del");
 
-const filePathToChangedLines = {} as { [key in string]: Set<number> };
-const filePathToComments = {} as { [key in string]: GithubComment[] };
-const existingComments = [] as GithubComment[];
-const inputs = {
-  severityThreshold: 0,
-  strictlyEnforcedRules: "",
-} as PluginInputs;
-
-let findings = [] as ScannerFinding[];
-let pullRequest = {} as typeof context.payload.pull_request;
 let hasHaltingError = false;
-let scannerCliArgs = "";
 
 /**
  * @description Collects and verifies the inputs from the action context and metadata
@@ -101,18 +91,28 @@ function initialSetup() {
     tsConfig: core.getInput("tsconfig"),
   } as ScannerFlags;
 
-  scannerCliArgs = (Object.keys(scannerFlags) as Array<keyof ScannerFlags>)
+  const scannerCliArgs = (
+    Object.keys(scannerFlags) as Array<keyof ScannerFlags>
+  )
     .map(
       (key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}"` : ""}`
     )
     .join(" ");
   // TODO: validate inputs
-  inputs.severityThreshold = parseInt(core.getInput("severity-threshold")) || 5;
-  inputs.strictlyEnforcedRules = core.getInput("strictly-enforced-rules");
-  pullRequest = github.context.payload.pull_request;
+  const inputs = {
+    severityThreshold: parseInt(core.getInput("severity-threshold")) || 5,
+    strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
+  } as PluginInputs;
+  return {
+    inputs,
+    pullRequest: github.context.payload.pull_request,
+    scannerCliArgs,
+  };
 }
 
-function getGithubRestApiClient() {
+function getGithubRestApiClient(
+  pullRequest: typeof context.payload.pull_request
+) {
   const octokit = new Octokit();
   const owner = pullRequest?.base?.repo?.owner?.login;
   const repo = pullRequest?.base?.repo?.name;
@@ -123,7 +123,7 @@ function getGithubRestApiClient() {
 /**
  * @description Validate that the action is called from within the scope of a pull request
  */
-function validatePullRequestContext() {
+function validatePullRequestContext(pullRequest: GithubPullRequest) {
   console.log("Validating that this action was invoked from a pull request...");
   if (!pullRequest) {
     core.setFailed(
@@ -137,79 +137,94 @@ function validatePullRequestContext() {
  * @description Calculates the diff for all files within the pull request and
  * populates a map of filePath -> Set of changed line numbers
  */
-function getDiffInPullRequest() {
+async function getDiffInPullRequest(pullRequest: GithubPullRequest) {
+  const filePathToChangedLines = new Map<string, Set<number>>();
   console.log("Getting difference within the pull request...");
-  execSync(
-    `git remote add -f destination ${pullRequest?.base?.repo?.clone_url}`
-  );
-  execSync(`git remote update`);
-  execSync(
-    `git diff destination/${pullRequest?.base?.ref}...origin/${pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
-  );
-  const files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
+  const potentialCloneUrl = pullRequest?.base?.repo?.clone_url;
+  if (!potentialCloneUrl) {
+    return filePathToChangedLines;
+  }
+  const git = simpleGit({
+    baseDir: process.cwd(),
+    binary: "git",
+    maxConcurrentProcesses: 6,
+    trimmed: false,
+  });
+  await git.addRemote("destination", potentialCloneUrl);
+  await git.remote(["update"]);
+
+  const diffString = await git.diff([
+    `destination/${pullRequest?.base?.ref}`,
+    `origin/${pullRequest?.head?.ref}`,
+  ]);
+
+  const files = parse(diffString);
+  const typesOfInterest = new Set<ChangeType>().add("add").add("del");
   for (let file of files) {
     if (file.to && fs.existsSync(file.to)) {
       let changedLines = new Set<number>();
       for (let chunk of file.chunks) {
         for (let change of chunk.changes) {
-          if (TYPES_OF_INTEREST.has(change.type)) {
+          if (typesOfInterest.has(change.type)) {
             changedLines.add(
               ((change as AddChange) || (change as DeleteChange)).ln
             );
           }
         }
       }
-      filePathToChangedLines[file.to] = changedLines;
+      filePathToChangedLines.set(file.to, changedLines);
     }
   }
+  return filePathToChangedLines;
 }
 
 /**
  * @description Moves all folders and files which were present in the
  * git difference to a temporary folder.
  */
-async function recursivelyMoveFilesToTempFolder() {
+async function recursivelyMoveFilesToTempFolder(
+  filePathToChangedLines: Map<string, Set<number>>
+) {
   console.log("Recursively moving all files to the temp folder...");
   const filesWithChanges = Object.keys(filePathToChangedLines);
   for (let file of filesWithChanges) {
     await copy(file, path.join(TEMP_DIR_NAME, file), {
       overwrite: true,
-    }).catch(function (error) {
+    }).catch((error: Error) => {
       core.setFailed("Copy failed: " + error);
     });
   }
 }
 
-async function getExistingComments() {
+async function getExistingComments(pullRequest: GithubPullRequest) {
   console.log("Getting existing comments using GitHub REST API...");
-  const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
+  const { octokit, owner, prNumber, repo } =
+    getGithubRestApiClient(pullRequest);
 
   const method = `GET /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
-  existingComments.push(
-    ...((await octokit.paginate(method)) as GithubComment[])
-  );
+  return (await octokit.paginate(method)) as GithubComment[];
 }
 
 /**
  * @description Uses the sfdx scanner to run static code analysis on
  * all files within the temporary directory.
  */
-function performStaticCodeAnalysisOnFilesInDiff() {
+function performStaticCodeAnalysisOnFilesInDiff(scannerCliArgs: string) {
   console.log(
     "Performing static code analysis on all of the files in the difference..."
   );
-  execSync(
-    `node_modules/sfdx-cli/bin/run scanner:run ${scannerCliArgs} \
-    --format json \
-    --target "${TEMP_DIR_NAME}" \
-    --outfile "${FINDINGS_OUTPUT}"`
-  );
+
+  sfdxCli(` scanner:run ${scannerCliArgs} \
+  --format json \
+  --target "${TEMP_DIR_NAME}" \
+  --outfile "${FINDINGS_OUTPUT}"`);
+
   const filePath = path.join(process.cwd(), FINDINGS_OUTPUT);
   if (fs.existsSync(filePath) === false) {
     console.log("No files applicable files identified in the difference...");
     process.exit();
   }
-  findings = JSON.parse(
+  const findings = JSON.parse(
     fs.readFileSync(filePath) as unknown as string
   ) as ScannerFinding[];
   for (let finding of findings) {
@@ -218,6 +233,7 @@ function performStaticCodeAnalysisOnFilesInDiff() {
       process.cwd()
     );
   }
+  return findings;
 }
 
 /**
@@ -226,30 +242,46 @@ function performStaticCodeAnalysisOnFilesInDiff() {
  * If a finding exists and covers a changed line, then translate that finding
  * object into a comment object.
  */
-function filterFindingsToDiffScope() {
+function filterFindingsToDiffScope(
+  findings: ScannerFinding[],
+  filePathToChangedLines: Map<string, Set<number>>,
+  inputs: PluginInputs,
+  pullRequest: GithubPullRequest
+) {
   console.log(
     "Filtering the findings to just the lines which are part of the pull request..."
   );
+  const filePathToComments = new Map<string, GithubComment[]>();
   for (let finding of findings) {
     const filePath = finding.fileName.replace(process.cwd() + "/", "");
-    const relevantLines = filePathToChangedLines[filePath];
+    const relevantLines =
+      filePathToChangedLines.get(filePath) || new Set<number>();
     for (let violation of finding.violations) {
       if (isInChangedLines(violation, relevantLines)) {
-        if (!filePathToComments[filePath]) {
-          filePathToComments[filePath] = [] as GithubComment[];
+        if (!filePathToComments.has(filePath)) {
+          filePathToComments.set(filePath, []);
         }
-        filePathToComments[filePath].push(
-          translateViolationToComment(filePath, violation, finding.engine)
-        );
+        filePathToComments
+          .get(filePath)
+          ?.push(
+            translateViolationToComment(
+              filePath,
+              violation,
+              finding.engine,
+              inputs,
+              pullRequest
+            )
+          );
       }
     }
   }
+  return filePathToComments;
 }
 
 /**
  * @description Determines if all lines within a violation have changed
- * @param {Violation} violation Violation from the sfdx scanner
- * @param {Set<Integer>} relevantLines Lines in the file which have changed
+ * @param {ScannerViolation} violation Violation from the sfdx scanner
+ * @param {Set<number>} relevantLines Lines in the file which have changed
  * @returns Boolean
  */
 function isInChangedLines(
@@ -281,9 +313,11 @@ function isInChangedLines(
 function translateViolationToComment(
   filePath: string,
   violation: ScannerViolation,
-  engine: string
+  engine: string,
+  inputs: PluginInputs,
+  pullRequest: GithubPullRequest
 ): GithubComment {
-  const type = getScannerViolationType(violation, engine);
+  const type = getScannerViolationType(inputs, violation, engine);
   if (type === "Error") {
     hasHaltingError = true;
   }
@@ -315,6 +349,7 @@ function translateViolationToComment(
  * @returns Boolean
  */
 function getScannerViolationType(
+  inputs: PluginInputs,
   violation: ScannerViolation,
   engine: string
 ): ScannerViolationType {
@@ -346,14 +381,20 @@ function getScannerViolationType(
  * @description Writes the relevant comments to the GitHub pull request.
  * Uses the octokit to post the comments to the PR.
  */
-async function writeComments() {
+async function writeComments(
+  existingComments: GithubComment[],
+  filePathToComments: Map<string, GithubComment[]>,
+  pullRequest: GithubPullRequest,
+  hasHaltingError: boolean
+) {
   console.log("Writing comments using GitHub REST API...");
-  const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
+  const { octokit, owner, prNumber, repo } =
+    getGithubRestApiClient(pullRequest);
   for (let file in filePathToComments) {
-    for (let comment of filePathToComments[file]) {
+    for (let comment of filePathToComments.get(file) || []) {
       // TODO: Add in resolving comments when the issue has been resolved?
       const existingComment = existingComments.find((existingComment) =>
-        matchComment(comment as GithubComment, existingComment)
+        matchComment(comment, existingComment)
       );
       if (!existingComment) {
         const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
@@ -380,14 +421,24 @@ function matchComment(commentA: GithubComment, commentB: GithubComment) {
  * @description Main method - injection point for code execution
  */
 async function main() {
-  initialSetup();
-  validatePullRequestContext();
-  getDiffInPullRequest();
-  await recursivelyMoveFilesToTempFolder();
-  performStaticCodeAnalysisOnFilesInDiff();
-  await getExistingComments();
-  filterFindingsToDiffScope();
-  writeComments();
+  const { inputs, pullRequest, scannerCliArgs } = initialSetup();
+  validatePullRequestContext(pullRequest);
+  const filePathToChangedLines = await getDiffInPullRequest(pullRequest);
+  await recursivelyMoveFilesToTempFolder(filePathToChangedLines);
+  const diffFindings = performStaticCodeAnalysisOnFilesInDiff(scannerCliArgs);
+  const existingComments = await getExistingComments(pullRequest);
+  const filePathToComments = filterFindingsToDiffScope(
+    diffFindings,
+    filePathToChangedLines,
+    inputs,
+    pullRequest
+  );
+  writeComments(
+    existingComments,
+    filePathToComments,
+    pullRequest,
+    hasHaltingError
+  );
 }
 
 main();
