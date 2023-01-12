@@ -44,29 +44,23 @@ scannerCliArgs = "";
  * https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#inputs
  */
 function initialSetup() {
-  // TODO: validate inputs
-  const inputs = {
-    severityThreshold: core.getInput("severity-threshold"),
-    strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
+  const scannerFlags = {
     category: core.getInput("category"),
     engine: core.getInput("engine"),
-    eslintEnv: core.getInput("eslint-env"),
-    eslintConfig: core.getInput("eslintconfig"),
-    pmdConfig: core.getInput("pmdconfig"),
+    env: core.getInput("eslint-env"),
+    eslintconfig: core.getInput("eslintconfig"),
+    pmdconfig: core.getInput("pmdconfig"),
     tsConfig: core.getInput("tsconfig"),
   };
 
-  let category = inputs.category ? `--category="${inputs.category}"` : "";
-  let engine = inputs.engine ? `--engine="${inputs.engine}"` : "";
-  let eslintEnv = inputs.eslintEnv ? `--env="${inputs.eslintEnv}"` : "";
-  let eslintConfig = inputs.eslintConfig
-    ? `--eslintconfig="${inputs.eslintConfig}"`
-    : "";
-  let pmdConfig = inputs.pmdConfig ? `--pmdconfig="${inputs.pmdConfig}"` : "";
-  let tsConfig = inputs.tsConfig ? `--tsconfig="${inputs.tsConfig}"` : "";
-  this.scannerCliArgs = `${category} ${engine} ${eslintEnv} ${eslintConfig} ${pmdConfig} ${tsConfig}`;
-
-  this.inputs = inputs;
+  this.scannerCliArgs = Object.keys(scannerFlags).map(
+    (key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}" ` : ""}`
+  );
+  // TODO: validate inputs
+  this.inputs = {
+    severityThreshold: core.getInput("severity-threshold"),
+    strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
+  };
   this.pullRequest = github.context?.payload?.pull_request;
 }
 
@@ -126,7 +120,7 @@ function getDiffInPullRequest() {
  */
 async function recursivelyMoveFilesToTempFolder() {
   console.log("Recursively moving all files to the temp folder...");
-  let filesWithChanges = Object.keys(this.filePathToChangedLines);
+  const filesWithChanges = Object.keys(this.filePathToChangedLines);
   for (let file of filesWithChanges) {
     await copy(file, path.join(TEMP_DIR_NAME, file), {
       overwrite: true,
@@ -158,7 +152,7 @@ function performStaticCodeAnalysisOnFilesInDiff() {
     --target "${TEMP_DIR_NAME}" \
     --outfile "${FINDINGS_OUTPUT}"`
   );
-  let filePath = path.join(process.cwd(), FINDINGS_OUTPUT);
+  const filePath = path.join(process.cwd(), FINDINGS_OUTPUT);
   if (fs.existsSync(filePath) === false) {
     console.log("No files applicable files identified in the difference...");
     process.exit();
@@ -183,7 +177,7 @@ function filterFindingsToDiffScope() {
     "Filtering the findings to just the lines which are part of the pull request..."
   );
   for (let finding of this.findings) {
-    let filePath = finding.fileName.replace(process.cwd() + "/", "");
+    const filePath = finding.fileName.replace(process.cwd() + "/", "");
     relevantLines = filePathToChangedLines[filePath];
     for (let violation of finding.violations) {
       if (isInChangedLines(violation, relevantLines)) {
