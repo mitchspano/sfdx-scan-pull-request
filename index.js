@@ -53,9 +53,11 @@ function initialSetup() {
     tsConfig: core.getInput("tsconfig"),
   };
 
-  this.scannerCliArgs = Object.keys(scannerFlags).map(
-    (key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}" ` : ""}`
-  );
+  this.scannerCliArgs = Object.keys(scannerFlags)
+    .map(
+      (key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}"` : ""}`
+    )
+    .join(" ");
   // TODO: validate inputs
   this.inputs = {
     severityThreshold: core.getInput("severity-threshold"),
