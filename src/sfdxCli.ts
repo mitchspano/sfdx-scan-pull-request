@@ -6,11 +6,14 @@ const cli = (() => {
   const currentCliVersion: string = require("../package.json").dependencies[
     "sfdx-cli"
   ].replace(/>(|=)|~|\^/, "");
-  sfdxCli
-    .create(currentCliVersion, "stable")
-    .run()
-    .then(flush)
-    .catch((_: Error) => {});
+  return new Promise((resolve) => {
+    sfdxCli
+      .create(currentCliVersion, "stable")
+      .run()
+      .then(flush)
+      .catch((_: Error) => {})
+      .finally(resolve);
+  });
 })();
 
-export default cli as unknown as (cliArgs: string) => void;
+export default cli as unknown as <T>(cliArgs: string) => Promise<T>;

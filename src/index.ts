@@ -44,6 +44,8 @@ type ScannerFinding = {
 
 type ScannerViolation = UrlObject & {
   category: string;
+  column: string;
+  endColumn: string;
   endLine: string;
   line: string;
   message: string;
@@ -209,24 +211,17 @@ async function getExistingComments(pullRequest: GithubPullRequest) {
  * @description Uses the sfdx scanner to run static code analysis on
  * all files within the temporary directory.
  */
-function performStaticCodeAnalysisOnFilesInDiff(scannerCliArgs: string) {
+async function performStaticCodeAnalysisOnFilesInDiff(scannerCliArgs: string) {
   console.log(
     "Performing static code analysis on all of the files in the difference..."
   );
 
-  sfdxCli(` scanner:run ${scannerCliArgs} \
-  --format json \
-  --target "${TEMP_DIR_NAME}" \
-  --outfile "${FINDINGS_OUTPUT}"`);
+  const findingsJsonString =
+    await sfdxCli<string>(` scanner:run ${scannerCliArgs} \
+      --format json \
+      --target "${TEMP_DIR_NAME}"`);
+  const findings = JSON.parse(findingsJsonString) as ScannerFinding[];
 
-  const filePath = path.join(process.cwd(), FINDINGS_OUTPUT);
-  if (fs.existsSync(filePath) === false) {
-    console.log("No files applicable files identified in the difference...");
-    process.exit();
-  }
-  const findings = JSON.parse(
-    fs.readFileSync(filePath) as unknown as string
-  ) as ScannerFinding[];
   for (let finding of findings) {
     finding.fileName = finding.fileName.replace(
       path.join(process.cwd(), TEMP_DIR_NAME),
@@ -425,7 +420,9 @@ async function main() {
   validatePullRequestContext(pullRequest);
   const filePathToChangedLines = await getDiffInPullRequest(pullRequest);
   await recursivelyMoveFilesToTempFolder(filePathToChangedLines);
-  const diffFindings = performStaticCodeAnalysisOnFilesInDiff(scannerCliArgs);
+  const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
+    scannerCliArgs
+  );
   const existingComments = await getExistingComments(pullRequest);
   const filePathToComments = filterFindingsToDiffScope(
     diffFindings,
