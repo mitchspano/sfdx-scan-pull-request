@@ -11,8 +11,8 @@
    limitations under the License.
  */
 
-const { execSync } = require("child_process");
-const { Octokit } = require("@octokit/action");
+const {execSync} = require("child_process");
+const {Octokit} = require("@octokit/action");
 const copy = require("recursive-copy");
 const core = require("@actions/core");
 const fs = require("fs");
@@ -75,7 +75,7 @@ function getGithubRestApiClient() {
   const owner = this.pullRequest?.base?.repo?.owner?.login;
   const repo = this.pullRequest?.base?.repo?.name;
   const prNumber = this.pullRequest?.number;
-  return { octokit, owner, prNumber, repo };
+  return {octokit, owner, prNumber, repo};
 }
 
 /**
@@ -138,7 +138,7 @@ async function recursivelyMoveFilesToTempFolder() {
 
 async function getExistingComments() {
   console.log("Getting existing comments using GitHub REST API...");
-  const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
+  const {octokit, owner, prNumber, repo} = getGithubRestApiClient();
 
   const method = `GET /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
   this.existingComments = await octokit.paginate(method);
@@ -191,7 +191,7 @@ function filterFindingsToDiffScope() {
           filePathToComments[filePath] = [];
         }
         filePathToComments[filePath].push(
-          translateViolationToComment(filePath, violation, finding.engine)
+          translateViolationToAnnotations(filePath, violation, finding.engine)
         );
       }
     }
@@ -255,6 +255,40 @@ function translateViolationToComment(filePath, violation, engine) {
 }
 
 /**
+ * @description Translates a violation object into a comment
+ * with a formatted body
+ * @param {Violation} violation Violation from the sfdx scanner
+ * @param {String} engine Engine from the sfdx scanner
+ * @returns Comment
+ */
+function translateViolationToAnnotations(filePath, violation, engine) {
+  let type = isHaltingViolation(violation, engine) ? ERROR : WARNING;
+  if (type == ERROR) {
+    this.hasHaltingError = true;
+  }
+  let endLine = violation.endLine
+    ? parseInt(violation.endLine)
+    : parseInt(violation.line);
+  let startLine = parseInt(violation.line);
+  if (endLine == startLine) {
+    endLine++;
+  }
+  return {
+    path: filePath,
+    start_line: startLine,
+    start_side: RIGHT,
+    annotation_level: 'notice',
+    start_line: startLine,
+    message: violation.message,
+    title: violation.ruleName,
+    raw_details: `${COMMMENT_HEADER}
+| ${engine} | ${violation.category} | ${violation.ruleName} | ${violation.severity} | ${type} |
+
+[${violation.message}](${violation.url})`,
+  };
+}
+
+/**
  * @description Calculates if a violation will cause halting or not.
  * @param {Violation} violation Violation from the sfdx scanner
  * @param {String} engine Engine from the sfdx scanner
@@ -292,24 +326,22 @@ function isHaltingViolation(violation, engine) {
  */
 async function writeComments() {
   console.log("Writing comments using GitHub REST API...");
-  const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
-  for (let file in this.filePathToComments) {
-    for (let comment of this.filePathToComments[file]) {
-      // TODO: Add in resolving comments when the issue has been resolved?
-      const existingComment = this.existingComments.find((existingComment) =>
-        matchComment(comment, existingComment)
-      );
-      if (!existingComment) {
-        const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
-        await octokit.request(method, comment);
-      } else {
-        console.log(`Skipping existing comment ${existingComment.url}`);
-      }
+  const {octokit, owner, prNumber, repo} = getGithubRestApiClient();
+
+  const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/check-runs`;
+  const annotations = this.filePathToComments.values().flatten();
+  console.log(annotations);
+  await octokit.request(method, {
+    name: 'sfdx-scanner',
+    head_sha: repo.head_sha,
+    status: 'completed',
+    conclusion: 'Scanned',
+    output: {
+      title: 'sfdx-scanner-tittle',
+      summary: 'sfdx-scanner-summary',
+      annotations: annotations
     }
-  }
-  if (this.hasHaltingError === true) {
-    core.setFailed("A serious error has been identified");
-  }
+  });
 }
 
 function matchComment(commentA, commentB) {
