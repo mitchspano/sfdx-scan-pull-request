@@ -1,0 +1,12 @@
+{
+  "roots": ["<rootDir>/__tests__", "<rootDir>/src"],
+  "clearMocks": true,
+  "moduleFileExtensions": ["js", "ts"],
+  "testMatch": [
+    "**/__tests__/**/*.(spec|test).[jt]s?(x)",
+    "**/?(*.)+(spec|test).[jt]s?(x)"
+  ],
+  "transform": {
+    "^.+\\.(t|j)sx?$": "@swc/jest"
+  }
+}

@@ -20,7 +20,12 @@ import parse, { AddChange, ChangeType, DeleteChange } from "parse-diff";
 import path from "path";
 import { simpleGit } from "simple-git";
 
-import sfdxCli from "./sfdxCli";
+import {
+  scanFiles,
+  ScannerFinding,
+  ScannerViolation,
+  ScannerViolationType,
+} from "./sfdxCli";
 
 type PluginInputs = {
   severityThreshold: number;
@@ -36,26 +41,7 @@ type ScannerFlags = {
   tsConfig: string;
 };
 
-type ScannerFinding = {
-  fileName: string;
-  engine: string;
-  violations: ScannerViolation[];
-};
-
-type ScannerViolation = UrlObject & {
-  category: string;
-  column: string;
-  endColumn: string;
-  endLine: string;
-  line: string;
-  message: string;
-  ruleName: string;
-  severity: number;
-};
-
-type ScannerViolationType = "Error" | "Warning";
-
-type GithubComment = UrlObject & {
+type GithubComment = {
   commit_id: string;
   path: string;
   start_line: number;
@@ -63,9 +49,6 @@ type GithubComment = UrlObject & {
   side: GithubCommentSide;
   line: number;
   body: string;
-};
-
-type UrlObject = {
   url?: string;
 };
 
@@ -74,7 +57,6 @@ type GithubPullRequest = typeof context.payload.pull_request | undefined;
 
 const COMMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
 | --- | --- | --- | --- | --- |`;
-const FINDINGS_OUTPUT = "sfdx-scanner-findings.json";
 const TEMP_DIR_NAME = "temporary";
 
 let hasHaltingError = false;
@@ -95,11 +77,9 @@ function initialSetup() {
 
   const scannerCliArgs = (
     Object.keys(scannerFlags) as Array<keyof ScannerFlags>
-  )
-    .map(
-      (key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}"` : ""}`
-    )
-    .join(" ");
+  ).map(
+    (key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}"` : ""}`
+  );
   // TODO: validate inputs
   const inputs = {
     severityThreshold: parseInt(core.getInput("severity-threshold")) || 5,
@@ -211,17 +191,14 @@ async function getExistingComments(pullRequest: GithubPullRequest) {
  * @description Uses the sfdx scanner to run static code analysis on
  * all files within the temporary directory.
  */
-async function performStaticCodeAnalysisOnFilesInDiff(scannerCliArgs: string) {
+export async function performStaticCodeAnalysisOnFilesInDiff(
+  scannerCliArgs: string[]
+) {
   console.log(
     "Performing static code analysis on all of the files in the difference..."
   );
 
-  const findingsJsonString =
-    await sfdxCli<string>(` scanner:run ${scannerCliArgs} \
-      --format json \
-      --target "${TEMP_DIR_NAME}"`);
-  const findings = JSON.parse(findingsJsonString) as ScannerFinding[];
-
+  const findings = await scanFiles(scannerCliArgs);
   for (let finding of findings) {
     finding.fileName = finding.fileName.replace(
       path.join(process.cwd(), TEMP_DIR_NAME),
