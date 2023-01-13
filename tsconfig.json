@@ -6,7 +6,9 @@
     "outDir": "./lib",
     "rootDir": "./src",
     "strict": true,
-    "target": "es6"
+    "target": "es6",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "exclude": ["**/*.test.ts", "**.*.cls"]
 }

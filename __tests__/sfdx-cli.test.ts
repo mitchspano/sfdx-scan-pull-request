@@ -4,6 +4,11 @@ import path from "path";
 
 import { FINDINGS_OUTPUT, scanFiles } from "../src/sfdxCli";
 
+/**
+ * Totally goofy hack that allows the CLI to return data to us
+ * during tests - in local runs, this was taking about 9 seconds
+ * to complete scans, using 20 seconds for now as a safe buffer
+ */
 jest.useFakeTimers();
 jest.setTimeout(20000);
 
@@ -18,7 +23,11 @@ jest.mock("@oclif/errors/lib/logger", () => {
 
 describe("CLI tests!", () => {
   afterEach(() => {
-    fs.unlinkSync(FINDINGS_OUTPUT);
+    try {
+      fs.unlinkSync(FINDINGS_OUTPUT);
+    } catch (_) {
+      // swallow any exceptions
+    }
   });
 
   it("reports violations successfully", async () => {

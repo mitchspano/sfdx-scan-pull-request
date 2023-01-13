@@ -20,8 +20,8 @@
     "typescript": "^4.9.4"
   },
   "scripts": {
-    "build": "echo transpiling to js locally - you still need to run npm run package to get this ready for Github Actions && tsc",
-    "package": "npm run build && rimraf dist && esbuild src/index.ts --outfile=dist/index.js --bundle --platform=node --target=node16 --minify --sourcemap",
-    "test": "jest"
+    "build": "npm run tsc && rimraf dist && esbuild src/index.ts --outfile=dist/index.js --bundle --platform=node --target=node16 --minify --sourcemap",
+    "test": "jest --coverage",
+    "tsc": "tsc"
   }
 }
