@@ -47,7 +47,7 @@ export async function scanFiles(
     ...scannerCliArgs,
   ]);
 
-  return await new Promise((resolve) => {
+  return new Promise((resolve) => {
     fs.readFile(FINDINGS_OUTPUT, (_, data) => {
       resolve(JSON.parse(data.toString()));
     });
