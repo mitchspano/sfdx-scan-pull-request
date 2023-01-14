@@ -11,8 +11,8 @@
    limitations under the License.
  */
 
-const {execSync} = require("child_process");
-const {Octokit} = require("@octokit/action");
+const { execSync } = require("child_process");
+const { Octokit } = require("@octokit/action");
 const copy = require("recursive-copy");
 const core = require("@actions/core");
 const fs = require("fs");
@@ -75,7 +75,7 @@ function getGithubRestApiClient() {
   const owner = this.pullRequest?.base?.repo?.owner?.login;
   const repo = this.pullRequest?.base?.repo?.name;
   const prNumber = this.pullRequest?.number;
-  return {octokit, owner, prNumber, repo};
+  return { octokit, owner, prNumber, repo };
 }
 
 /**
@@ -138,7 +138,7 @@ async function recursivelyMoveFilesToTempFolder() {
 
 async function getExistingComments() {
   console.log("Getting existing comments using GitHub REST API...");
-  const {octokit, owner, prNumber, repo} = getGithubRestApiClient();
+  const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
 
   const method = `GET /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
   this.existingComments = await octokit.paginate(method);
@@ -277,7 +277,7 @@ function translateViolationToAnnotations(filePath, violation, engine) {
     path: filePath,
     start_line: startLine,
     start_side: RIGHT,
-    annotation_level: 'notice',
+    annotation_level: "notice",
     start_line: startLine,
     message: violation.message,
     title: violation.ruleName,
@@ -326,22 +326,26 @@ function isHaltingViolation(violation, engine) {
  */
 async function writeComments() {
   console.log("Writing comments using GitHub REST API...");
-  const {octokit, owner, prNumber, repo} = getGithubRestApiClient();
+  const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
 
   const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/check-runs`;
-  const annotations = this.filePathToComments.values().flatten();
+  console.log(this.filePathToComments);
+  const annotations = this.filePathToComments?.values().flatten();
+
   console.log(annotations);
-  await octokit.request(method, {
-    name: 'sfdx-scanner',
-    head_sha: repo.head_sha,
-    status: 'completed',
-    conclusion: 'Scanned',
-    output: {
-      title: 'sfdx-scanner-tittle',
-      summary: 'sfdx-scanner-summary',
-      annotations: annotations
-    }
-  });
+  if (annotations) {
+    await octokit.request(method, {
+      name: "sfdx-scanner",
+      head_sha: repo.head_sha,
+      status: "completed",
+      conclusion: "Scanned",
+      output: {
+        title: "sfdx-scanner-tittle",
+        summary: "sfdx-scanner-summary",
+        annotations: annotations,
+      },
+    });
+  }
 }
 
 function matchComment(commentA, commentB) {
