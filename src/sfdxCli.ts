@@ -24,15 +24,22 @@ export type ScannerViolation = {
 export type ScannerViolationType = "Error" | "Warning";
 
 const cli = async (cliArgs: string[]) => {
-  // actually works with tsbuild tree-shaking - it's a bingo!
   const currentCliVersion: string = require("../package.json").dependencies[
     "sfdx-cli"
   ].replace(/>(|=)|~|\^/, "");
-  const originalArgv = [...process.argv];
 
+  // create a copy of what the current argv's are to reset to later
+  // the CLI parses everything after the 2nd argument as "stuff that gets passed to SFDX"
+  const originalArgv = [...process.argv];
   process.argv = ["node", "unused", ...cliArgs];
-  const sfdx = sfdxCli.create(currentCliVersion, "stable");
-  await sfdx.run();
+
+  // this is currently a void method, which is a bit unfortunate as the "run" function
+  // retains the response returned by any sub-command until the penultimate moment
+  // which locks us into using the FINDINGS_OUTPUT file to get around this restriction.
+  // long-term, I hope to be able to convince the SFDX team to propagate command responses directly
+  // which would allow them to be awaitable and parseable right here
+  await sfdxCli.create(currentCliVersion, "stable").run();
+
   process.argv = originalArgv;
 };
 
