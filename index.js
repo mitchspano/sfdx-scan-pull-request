@@ -330,7 +330,7 @@ async function writeComments() {
 
   const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/check-runs`;
   console.log(this.filePathToComments);
-  const annotations = Object.values(this.filePathToComments).flatten();
+  const annotations = Object.values(this.filePathToComments).flat();
 
   console.log(annotations);
   if (annotations) {
