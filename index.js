@@ -75,7 +75,8 @@ function getGithubRestApiClient() {
   const owner = this.pullRequest?.base?.repo?.owner?.login;
   const repo = this.pullRequest?.base?.repo?.name;
   const prNumber = this.pullRequest?.number;
-  return { octokit, owner, prNumber, repo };
+  const sha = github.context?.sha;
+  return { octokit, owner, prNumber, repo, sha };
 }
 
 /**
@@ -275,10 +276,10 @@ function translateViolationToAnnotations(filePath, violation, engine) {
   }
   return {
     path: filePath,
-    start_line: startLine,
     start_side: RIGHT,
     annotation_level: "notice",
     start_line: startLine,
+    end_line: endLine,
     message: violation.message,
     title: violation.ruleName,
     raw_details: `${COMMMENT_HEADER}
@@ -326,7 +327,7 @@ function isHaltingViolation(violation, engine) {
  */
 async function writeComments() {
   console.log("Writing comments using GitHub REST API...");
-  const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
+  const { octokit, owner, repo, sha } = getGithubRestApiClient();
 
   const method = `POST /repos/${owner}/${repo}/check-runs`; // /repos/{owner}/{repo}/check-runs
   console.log(this.filePathToComments);
@@ -336,7 +337,7 @@ async function writeComments() {
   if (annotations) {
     await octokit.request(method, {
       name: "sfdx-scanner-name",
-      head_sha: repo.head_sha,
+      head_sha: sha,
       status: "completed",
       conclusion: "Scanned",
       output: {
