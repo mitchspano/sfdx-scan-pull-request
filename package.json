@@ -20,7 +20,7 @@
     "typescript": "^4.9.4"
   },
   "scripts": {
-    "build": "npm run tsc && rimraf dist && esbuild src/index.ts --outfile=dist/index.js --bundle --platform=node --target=node16 --minify --sourcemap",
+    "build": "npm run test && npm run tsc && rimraf dist && esbuild src/index.ts --outfile=dist/index.js --bundle --platform=node --target=node16 --minify --sourcemap",
     "test": "jest --coverage",
     "tsc": "tsc"
   }

@@ -11,14 +11,13 @@
    limitations under the License.
  */
 
-import core from "@actions/core";
+import { getInput, setFailed } from "@actions/core";
 import { Octokit } from "@octokit/action";
 import copy from "recursive-copy";
-import fs from "fs";
 import github, { context } from "@actions/github";
-import parse, { AddChange, ChangeType, DeleteChange } from "parse-diff";
-import path from "path";
-import { simpleGit } from "simple-git";
+import { join } from "path";
+
+import { getDiffInPullRequest, GithubPullRequest } from "./git-actions";
 
 import {
   scanFiles,
@@ -53,7 +52,6 @@ type GithubComment = {
 };
 
 type GithubCommentSide = "RIGHT";
-type GithubPullRequest = typeof context.payload.pull_request | undefined;
 
 const COMMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
 | --- | --- | --- | --- | --- |`;
@@ -67,12 +65,12 @@ let hasHaltingError = false;
  */
 function initialSetup() {
   const scannerFlags = {
-    category: core.getInput("category"),
-    engine: core.getInput("engine"),
-    env: core.getInput("eslint-env"),
-    eslintconfig: core.getInput("eslintconfig"),
-    pmdconfig: core.getInput("pmdconfig"),
-    tsConfig: core.getInput("tsconfig"),
+    category: getInput("category"),
+    engine: getInput("engine"),
+    env: getInput("eslint-env"),
+    eslintconfig: getInput("eslintconfig"),
+    pmdconfig: getInput("pmdconfig"),
+    tsConfig: getInput("tsconfig"),
   } as ScannerFlags;
 
   const scannerCliArgs = (
@@ -82,8 +80,8 @@ function initialSetup() {
   );
   // TODO: validate inputs
   const inputs = {
-    severityThreshold: parseInt(core.getInput("severity-threshold")) || 5,
-    strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
+    severityThreshold: parseInt(getInput("severity-threshold")) || 5,
+    strictlyEnforcedRules: getInput("strictly-enforced-rules"),
   } as PluginInputs;
   return {
     inputs,
@@ -108,56 +106,11 @@ function getGithubRestApiClient(
 function validatePullRequestContext(pullRequest: GithubPullRequest) {
   console.log("Validating that this action was invoked from a pull request...");
   if (!pullRequest) {
-    core.setFailed(
+    setFailed(
       "This action is only applicable when invoked in the context of a pull request."
     );
     process.exit();
   }
-}
-
-/**
- * @description Calculates the diff for all files within the pull request and
- * populates a map of filePath -> Set of changed line numbers
- */
-async function getDiffInPullRequest(pullRequest: GithubPullRequest) {
-  const filePathToChangedLines = new Map<string, Set<number>>();
-  console.log("Getting difference within the pull request...");
-  const potentialCloneUrl = pullRequest?.base?.repo?.clone_url;
-  if (!potentialCloneUrl) {
-    return filePathToChangedLines;
-  }
-  const git = simpleGit({
-    baseDir: process.cwd(),
-    binary: "git",
-    maxConcurrentProcesses: 6,
-    trimmed: false,
-  });
-  await git.addRemote("destination", potentialCloneUrl);
-  await git.remote(["update"]);
-
-  const diffString = await git.diff([
-    `destination/${pullRequest?.base?.ref}`,
-    `origin/${pullRequest?.head?.ref}`,
-  ]);
-
-  const files = parse(diffString);
-  const typesOfInterest = new Set<ChangeType>().add("add").add("del");
-  for (let file of files) {
-    if (file.to && fs.existsSync(file.to)) {
-      let changedLines = new Set<number>();
-      for (let chunk of file.chunks) {
-        for (let change of chunk.changes) {
-          if (typesOfInterest.has(change.type)) {
-            changedLines.add(
-              ((change as AddChange) || (change as DeleteChange)).ln
-            );
-          }
-        }
-      }
-      filePathToChangedLines.set(file.to, changedLines);
-    }
-  }
-  return filePathToChangedLines;
 }
 
 /**
@@ -170,12 +123,13 @@ async function recursivelyMoveFilesToTempFolder(
   console.log("Recursively moving all files to the temp folder...");
   const filesWithChanges = Object.keys(filePathToChangedLines);
   for (let file of filesWithChanges) {
-    await copy(file, path.join(TEMP_DIR_NAME, file), {
+    await copy(file, join(TEMP_DIR_NAME, file), {
       overwrite: true,
     }).catch((error: Error) => {
-      core.setFailed("Copy failed: " + error);
+      setFailed("Copy failed: " + error);
     });
   }
+  return filePathToChangedLines;
 }
 
 async function getExistingComments(pullRequest: GithubPullRequest) {
@@ -201,7 +155,7 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
   const findings = await scanFiles(scannerCliArgs);
   for (let finding of findings) {
     finding.fileName = finding.fileName.replace(
-      path.join(process.cwd(), TEMP_DIR_NAME),
+      join(process.cwd(), TEMP_DIR_NAME),
       process.cwd()
     );
   }
@@ -296,8 +250,8 @@ function translateViolationToComment(
   let endLine = violation.endLine
     ? parseInt(violation.endLine)
     : parseInt(violation.line);
-  let startLine = parseInt(violation.line);
-  if (endLine == startLine) {
+  const startLine = parseInt(violation.line);
+  if (endLine === startLine) {
     endLine++;
   }
   return {
@@ -307,10 +261,7 @@ function translateViolationToComment(
     start_side: "RIGHT",
     side: "RIGHT",
     line: endLine,
-    body: `${COMMMENT_HEADER}
-| ${engine} | ${violation.category} | ${violation.ruleName} | ${violation.severity} | ${type} |
-
-[${violation.message}](${violation.url})`,
+    body: `${COMMMENT_HEADER} | ${engine} | ${violation.category} | ${violation.ruleName} | ${violation.severity} | ${type} | [${violation.message}](${violation.url})`,
   };
 }
 
@@ -377,7 +328,7 @@ async function writeComments(
     }
   }
   if (hasHaltingError === true) {
-    core.setFailed("A serious error has been identified");
+    setFailed("A serious error has been identified");
   }
 }
 
@@ -395,12 +346,23 @@ function matchComment(commentA: GithubComment, commentB: GithubComment) {
 async function main() {
   const { inputs, pullRequest, scannerCliArgs } = initialSetup();
   validatePullRequestContext(pullRequest);
-  const filePathToChangedLines = await getDiffInPullRequest(pullRequest);
-  await recursivelyMoveFilesToTempFolder(filePathToChangedLines);
+
+  const [filePathToChangedLines, existingComments] = await Promise.all([
+    getDiffInPullRequest(
+      [
+        `destination/${pullRequest?.base?.ref}`,
+        `origin/${pullRequest?.head?.ref}`,
+      ],
+      pullRequest?.base?.repo?.clone_url
+    ).then(recursivelyMoveFilesToTempFolder),
+    getExistingComments(pullRequest),
+  ]);
+
+  // temporally depends on "recursivelyMoveFilesToTempFolder"
+  // as we only scan updated files
   const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
     scannerCliArgs
   );
-  const existingComments = await getExistingComments(pullRequest);
   const filePathToComments = filterFindingsToDiffScope(
     diffFindings,
     filePathToChangedLines,

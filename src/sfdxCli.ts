@@ -1,5 +1,5 @@
 import * as sfdxCli from "sfdx-cli/dist/cli";
-import fs from "fs";
+import { readFile } from "fs";
 
 export const FINDINGS_OUTPUT = "sfdx-scanner-findings.json";
 
@@ -48,7 +48,7 @@ export async function scanFiles(
   ]);
 
   return new Promise((resolve) => {
-    fs.readFile(FINDINGS_OUTPUT, (_, data) => {
+    readFile(FINDINGS_OUTPUT, (_, data) => {
       resolve(JSON.parse(data.toString()));
     });
   });

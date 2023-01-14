@@ -1,0 +1,49 @@
+import parse, { AddChange, ChangeType, DeleteChange } from "parse-diff";
+import { simpleGit } from "simple-git";
+import { context } from "@actions/github";
+
+export type GithubPullRequest = typeof context.payload.pull_request | undefined;
+
+export const git = simpleGit({
+  baseDir: process.cwd(),
+  binary: "git",
+  maxConcurrentProcesses: 6,
+  trimmed: false,
+});
+
+/**
+ * @description Calculates the diff for all files within the pull request and
+ * populates a map of filePath -> Set of changed line numbers
+ */
+export async function getDiffInPullRequest(
+  diffArgs: string[],
+  destination?: string
+) {
+  const filePathToChangedLines = new Map<string, Set<number>>();
+  console.log("Getting difference within the pull request...");
+  if (destination) {
+    await git.addRemote("destination", destination);
+    await git.remote(["update"]);
+  }
+
+  const diffString = await git.diff(diffArgs);
+  const files = parse(diffString);
+
+  const typesOfInterest = new Set<ChangeType>().add("add").add("del");
+  for (let file of files) {
+    if (file.to && file.to !== "/dev/null") {
+      const changedLines = new Set<number>();
+      for (let chunk of file.chunks) {
+        for (let change of chunk.changes) {
+          if (typesOfInterest.has(change.type)) {
+            changedLines.add(
+              ((change as AddChange) || (change as DeleteChange)).ln
+            );
+          }
+        }
+      }
+      filePathToChangedLines.set(file.to, changedLines);
+    }
+  }
+  return filePathToChangedLines;
+}
