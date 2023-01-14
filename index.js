@@ -328,14 +328,14 @@ async function writeComments() {
   console.log("Writing comments using GitHub REST API...");
   const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
 
-  const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/check-runs`;
+  const method = `POST /repos/${owner}/${repo}/check-runs`; // /repos/{owner}/{repo}/check-runs
   console.log(this.filePathToComments);
   const annotations = Object.values(this.filePathToComments).flat();
 
   console.log(annotations);
   if (annotations) {
     await octokit.request(method, {
-      name: "sfdx-scanner",
+      name: "sfdx-scanner-name",
       head_sha: repo.head_sha,
       status: "completed",
       conclusion: "Scanned",
