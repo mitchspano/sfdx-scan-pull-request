@@ -337,7 +337,7 @@ async function writeComments() {
   if (annotations) {
     const request =  {
       name: "sfdx-scanner-name",
-      head_sha: sha,
+      head_sha: process.env.GITHUB_SHA,
       status: "completed",
       conclusion: "success",
       output: {
