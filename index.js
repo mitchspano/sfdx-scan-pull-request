@@ -339,7 +339,7 @@ async function writeComments() {
       name: "sfdx-scanner-name",
       head_sha: sha,
       status: "completed",
-      conclusion: "Scanned",
+      conclusion: "success",
       output: {
         title: "sfdx-scanner-tittle",
         summary: "sfdx-scanner-summary",
