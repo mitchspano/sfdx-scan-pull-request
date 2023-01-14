@@ -335,7 +335,7 @@ async function writeComments() {
 
   console.log(annotations);
   if (annotations) {
-    await octokit.request(method, {
+    const request =  {
       name: "sfdx-scanner-name",
       head_sha: sha,
       status: "completed",
@@ -345,7 +345,10 @@ async function writeComments() {
         summary: "sfdx-scanner-summary",
         annotations: annotations,
       },
-    });
+    };
+    console.log(request);
+    console.log(process.env);
+    await octokit.request(method,request);
   }
 }
 
