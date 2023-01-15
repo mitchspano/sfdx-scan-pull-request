@@ -344,6 +344,7 @@ async function writeComments() {
         title: "sfdx-scanner-tittle",
         summary: "sfdx-scanner-summary",
         annotations: annotations,
+        text: 'sfdx-scanner-text'
       },
     };
     console.log(request);
