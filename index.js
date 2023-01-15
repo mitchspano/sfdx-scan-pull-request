@@ -76,7 +76,7 @@ function getGithubRestApiClient() {
   const owner = this.pullRequest?.base?.repo?.owner?.login;
   const repo = this.pullRequest?.base?.repo?.name;
   const prNumber = this.pullRequest?.number;
-  return { octokit, owner, prNumber, repo, sha };
+  return { octokit, owner, prNumber, repo };
 }
 
 /**
