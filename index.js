@@ -281,13 +281,17 @@ function translateViolationToAnnotations(filePath, violation, engine) {
     annotation_level: "notice",
     start_line: startLine,
     end_line: endLine,
-    message: violation.message,
-    title: violation.ruleName,
-    raw_details: `${COMMMENT_HEADER}
+    message: `**${violation.category}** [${violation.message}](${violation.url})`,
+    title: `${violation.ruleName} (sev: ${violation.severity})`,
+  };
+
+  /*
+      body: `${COMMMENT_HEADER}
 | ${engine} | ${violation.category} | ${violation.ruleName} | ${violation.severity} | ${type} |
 
 [${violation.message}](${violation.url})`,
   };
+   */
 }
 
 /**
@@ -338,12 +342,12 @@ async function writeComments() {
   console.log(annotations);
   if (annotations) {
     const request =  {
-      name: "sfdx-scanner-name",
+      name: "sfdx-scanner",
       head_sha: this.inputs.commitSha,
       status: "completed",
-      conclusion: "action_required",
+      conclusion: "neutral",
       output: {
-        title: "sfdx-scanner-tittle",
+        title: "sfdx-scanner-title",
         summary: "sfdx-scanner-summary",
         annotations: annotations,
         text: 'sfdx-scanner-text'
