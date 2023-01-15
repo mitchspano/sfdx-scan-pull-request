@@ -281,7 +281,7 @@ function translateViolationToAnnotations(filePath, violation, engine) {
     annotation_level: "notice",
     start_line: startLine,
     end_line: endLine,
-    message: `**${violation.category}** [${violation.message}](${violation.url})`,
+    message: `${violation.category} ${violation.message}\n${violation.url}`,
     title: `${violation.ruleName} (sev: ${violation.severity})`,
   };
 
