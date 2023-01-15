@@ -54,6 +54,7 @@ function initialSetup() {
     eslintConfig: core.getInput("eslintconfig"),
     pmdConfig: core.getInput("pmdconfig"),
     tsConfig: core.getInput("tsconfig"),
+    commitSha: core.getInput("commit_sha"),
   };
 
   let category = inputs.category ? `--category="${inputs.category}"` : "";
@@ -331,6 +332,7 @@ async function writeComments() {
 
   const method = `POST /repos/${owner}/${repo}/check-runs`; // /repos/{owner}/{repo}/check-runs
   console.log(this.filePathToComments);
+  console.log('this.inputs', this.inputs, core.getInput("commit_sha"));
   const annotations = Object.values(this.filePathToComments).flat();
 
   console.log(annotations);
