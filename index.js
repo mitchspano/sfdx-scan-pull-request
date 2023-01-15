@@ -339,7 +339,7 @@ async function writeComments() {
       name: "sfdx-scanner-name",
       head_sha: process.env.GITHUB_SHA,
       status: "completed",
-      conclusion: "success",
+      conclusion: "action_required",
       output: {
         title: "sfdx-scanner-tittle",
         summary: "sfdx-scanner-summary",
@@ -347,8 +347,9 @@ async function writeComments() {
       },
     };
     console.log(request);
-    console.log(process.env);
-    await octokit.request(method,request);
+    // console.log(process.env);
+    const result = await octokit.request(method,request);
+    console.log(result);
   }
 }
 
