@@ -20,8 +20,8 @@ const github = require("@actions/github");
 const parse = require("parse-diff");
 const path = require("path");
 
-const COMMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
-| --- | --- | --- | --- | --- |`;
+/*const COMMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
+| --- | --- | --- | --- | --- |`;*/
 const DIFF_OUTPUT = "diffBetweenCurrentAndParentBranch.txt";
 const ERROR = "Error";
 const FINDINGS_OUTPUT = "sfdx-scanner-findings.json";
@@ -76,7 +76,6 @@ function getGithubRestApiClient() {
   const owner = this.pullRequest?.base?.repo?.owner?.login;
   const repo = this.pullRequest?.base?.repo?.name;
   const prNumber = this.pullRequest?.number;
-  const sha = github.context?.sha;
   return { octokit, owner, prNumber, repo, sha };
 }
 
@@ -99,10 +98,10 @@ function validatePullRequestContext() {
  */
 function getDiffInPullRequest() {
   console.log("Getting difference within the pull request...");
-  execSync(
+  /*  execSync(
     `git remote add -f destination ${this.pullRequest.base.repo.clone_url}`
   );
-  execSync(`git remote update`);
+  execSync(`git remote update`);*/
   execSync(
     `git diff destination/${this.pullRequest?.base?.ref}...origin/${this.pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
   );
@@ -138,13 +137,13 @@ async function recursivelyMoveFilesToTempFolder() {
   }
 }
 
-async function getExistingComments() {
+/*async function getExistingComments() {
   console.log("Getting existing comments using GitHub REST API...");
   const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
 
   const method = `GET /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
   this.existingComments = await octokit.paginate(method);
-}
+}*/
 
 /**
  * @description Uses the sfdx scanner to run static code analysis on
@@ -221,14 +220,14 @@ function isInChangedLines(violation, relevantLines) {
   }
   return true;
 }
-
-/**
+/*
+/!**
  * @description Translates a violation object into a comment
  * with a formatted body
  * @param {Violation} violation Violation from the sfdx scanner
  * @param {String} engine Engine from the sfdx scanner
  * @returns Comment
- */
+ *!/
 function translateViolationToComment(filePath, violation, engine) {
   let type = isHaltingViolation(violation, engine) ? ERROR : WARNING;
   if (type == ERROR) {
@@ -254,7 +253,7 @@ function translateViolationToComment(filePath, violation, engine) {
 
 [${violation.message}](${violation.url})`,
   };
-}
+}*/
 
 /**
  * @description Translates a violation object into a comment
@@ -284,14 +283,6 @@ function translateViolationToAnnotations(filePath, violation, engine) {
     message: `${violation.category} ${violation.message}\n${violation.url}`,
     title: `${violation.ruleName} (sev: ${violation.severity})`,
   };
-
-  /*
-      body: `${COMMMENT_HEADER}
-| ${engine} | ${violation.category} | ${violation.ruleName} | ${violation.severity} | ${type} |
-
-[${violation.message}](${violation.url})`,
-  };
-   */
 }
 
 /**
@@ -332,41 +323,40 @@ function isHaltingViolation(violation, engine) {
  */
 async function writeComments() {
   console.log("Writing comments using GitHub REST API...");
-  const { octokit, owner, repo, sha } = getGithubRestApiClient();
+  const { octokit, owner, repo } = getGithubRestApiClient();
 
   const method = `POST /repos/${owner}/${repo}/check-runs`; // /repos/{owner}/{repo}/check-runs
   console.log(this.filePathToComments);
-  console.log('this.inputs', this.inputs, core.getInput("commit_sha"));
+  console.log("this.inputs", this.inputs, core.getInput("commit_sha"));
   const annotations = Object.values(this.filePathToComments).flat();
 
   console.log(annotations);
   if (annotations) {
-    const request =  {
+    const request = {
       name: "sfdx-scanner",
       head_sha: this.inputs.commitSha,
       status: "completed",
       conclusion: "neutral",
       output: {
-        title: "sfdx-scanner-title",
-        summary: "sfdx-scanner-summary",
+        title: "Results from sfdx-scanner",
+        summary: `${annotations.length} violations found`,
         annotations: annotations,
-        text: 'sfdx-scanner-text'
       },
     };
     console.log(request);
     // console.log(process.env);
-    const result = await octokit.request(method,request);
+    const result = await octokit.request(method, request);
     console.log(result);
   }
 }
 
-function matchComment(commentA, commentB) {
+/*function matchComment(commentA, commentB) {
   return (
     commentA.line === commentB.line &&
     commentA.body === commentB.body &&
     commentA.path === commentB.path
   );
-}
+}*/
 
 /**
  * @description Main method - injection point for code execution
@@ -377,7 +367,7 @@ async function main() {
   getDiffInPullRequest();
   await recursivelyMoveFilesToTempFolder();
   performStaticCodeAnalysisOnFilesInDiff();
-  await getExistingComments();
+  // await getExistingComments();
   filterFindingsToDiffScope();
   writeComments();
 }
