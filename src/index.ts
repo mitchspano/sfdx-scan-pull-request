@@ -349,10 +349,7 @@ async function main() {
 
   const [filePathToChangedLines, existingComments] = await Promise.all([
     getDiffInPullRequest(
-      [
-        `destination/${pullRequest?.base?.ref}`,
-        `origin/${pullRequest?.head?.ref}`,
-      ],
+      [pullRequest?.head?.ref, pullRequest?.base?.ref],
       pullRequest?.base?.repo?.clone_url
     ).then(recursivelyMoveFilesToTempFolder),
     getExistingComments(pullRequest),

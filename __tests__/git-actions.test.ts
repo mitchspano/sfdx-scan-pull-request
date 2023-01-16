@@ -12,7 +12,7 @@ describe("Git action tests", () => {
     git.add(testFilePath);
 
     const diff = await getDiffInPullRequest([
-      `origin/${execSync("git rev-parse --abbrev-ref HEAD").toString().trim()}`,
+      execSync("git rev-parse --abbrev-ref HEAD").toString().trim(),
     ]);
 
     const newLines = diff.get(testFilePath);
@@ -23,16 +23,17 @@ describe("Git action tests", () => {
     git.add(testFilePath);
   });
 
-  it("adds remote origin", async () => {
+  it("adds remote origin & properly points PR args to git remotes", async () => {
+    const pullRequestArgs = ["main", "main"];
+
     await getDiffInPullRequest(
-      [],
+      pullRequestArgs,
       "https://github.com/mitchspano/sfdx-scan-pull-request.git"
     );
 
     expect(
       (await git.getRemotes()).filter((remote) => remote.name === "destination")
     ).toBeTruthy();
-
     git.removeRemote("destination");
   });
 });
