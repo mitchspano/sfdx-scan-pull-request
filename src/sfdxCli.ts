@@ -9,6 +9,16 @@ export type ScannerFinding = {
   violations: ScannerViolation[];
 };
 
+export type ScannerFlags = {
+  category?: string;
+  engine?: string;
+  env?: string;
+  eslintconfig?: string;
+  pmdconfig?: string;
+  target: string;
+  tsConfig?: string;
+};
+
 export type ScannerViolation = {
   category: string;
   column: string;
@@ -23,7 +33,7 @@ export type ScannerViolation = {
 
 export type ScannerViolationType = "Error" | "Warning";
 
-const cli = async (cliArgs: string[]) => {
+const cli = async <T>(cliArgs: string[]) => {
   const currentCliVersion: string = require("../package.json").dependencies[
     "sfdx-cli"
   ].replace(/>(|=)|~|\^/, "");
@@ -38,14 +48,20 @@ const cli = async (cliArgs: string[]) => {
   // which locks us into using the FINDINGS_OUTPUT file to get around this restriction.
   // long-term, I hope to be able to convince the SFDX team to propagate command responses directly
   // which would allow them to be awaitable and parseable right here
-  await sfdxCli.create(currentCliVersion, "stable").run();
+  const result = (await sfdxCli.create(currentCliVersion, "stable").run()) as T;
 
   process.argv = originalArgv;
+  return result;
 };
 
 export async function scanFiles(
-  scannerCliArgs: string[]
+  scannerFlags: ScannerFlags
 ): Promise<ScannerFinding[]> {
+  const scannerCliArgs = (
+    Object.keys(scannerFlags) as Array<keyof ScannerFlags>
+  ).map(
+    (key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}"` : ""}`
+  );
   await cli([
     "scanner:run",
     "--json",

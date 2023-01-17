@@ -22,6 +22,7 @@ import { getDiffInPullRequest, GithubPullRequest } from "./git-actions";
 import {
   scanFiles,
   ScannerFinding,
+  ScannerFlags,
   ScannerViolation,
   ScannerViolationType,
 } from "./sfdxCli";
@@ -29,15 +30,6 @@ import {
 type PluginInputs = {
   severityThreshold: number;
   strictlyEnforcedRules: string;
-};
-
-type ScannerFlags = {
-  category: string;
-  engine: string;
-  env: string;
-  eslintconfig: string;
-  pmdconfig: string;
-  tsConfig: string;
 };
 
 type GithubComment = {
@@ -70,23 +62,19 @@ function initialSetup() {
     env: getInput("eslint-env"),
     eslintconfig: getInput("eslintconfig"),
     pmdconfig: getInput("pmdconfig"),
+    target: TEMP_DIR_NAME,
     tsConfig: getInput("tsconfig"),
-  } as ScannerFlags;
+  };
 
-  const scannerCliArgs = (
-    Object.keys(scannerFlags) as Array<keyof ScannerFlags>
-  ).map(
-    (key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}"` : ""}`
-  );
   // TODO: validate inputs
   const inputs = {
     severityThreshold: parseInt(getInput("severity-threshold")) || 5,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
-  } as PluginInputs;
+  };
   return {
     inputs,
     pullRequest: github.context.payload.pull_request,
-    scannerCliArgs,
+    scannerFlags,
   };
 }
 
@@ -146,13 +134,13 @@ async function getExistingComments(pullRequest: GithubPullRequest) {
  * all files within the temporary directory.
  */
 export async function performStaticCodeAnalysisOnFilesInDiff(
-  scannerCliArgs: string[]
+  scannerFlags: ScannerFlags
 ) {
   console.log(
     "Performing static code analysis on all of the files in the difference..."
   );
 
-  const findings = await scanFiles(scannerCliArgs);
+  const findings = await scanFiles(scannerFlags);
   for (let finding of findings) {
     finding.fileName = finding.fileName.replace(
       join(process.cwd(), TEMP_DIR_NAME),
@@ -344,7 +332,7 @@ function matchComment(commentA: GithubComment, commentB: GithubComment) {
  * @description Main method - injection point for code execution
  */
 async function main() {
-  const { inputs, pullRequest, scannerCliArgs } = initialSetup();
+  const { inputs, pullRequest, scannerFlags } = initialSetup();
   validatePullRequestContext(pullRequest);
 
   const [filePathToChangedLines, existingComments] = await Promise.all([
@@ -358,7 +346,7 @@ async function main() {
   // temporally depends on "recursivelyMoveFilesToTempFolder"
   // as we only scan updated files
   const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
-    scannerCliArgs
+    scannerFlags
   );
   const filePathToComments = filterFindingsToDiffScope(
     diffFindings,

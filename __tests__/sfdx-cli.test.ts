@@ -31,12 +31,11 @@ describe("CLI tests!", () => {
   });
 
   it("reports violations successfully", async () => {
-    const findings = await scanFiles([
-      "--target",
-      path.join(process.cwd(), "__tests__/ExampleClass.cls"),
-      "--engine",
-      "pmd",
-    ]);
+    const scannerFlags = {
+      engine: "pmd",
+      target: path.join(process.cwd(), "__tests__/ExampleClass.cls"),
+    };
+    const findings = await scanFiles(scannerFlags);
     expect(fs.statSync(FINDINGS_OUTPUT).isFile()).toBeTruthy();
     expect(findings).toBeTruthy();
 
