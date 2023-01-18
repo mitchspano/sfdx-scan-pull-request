@@ -2,7 +2,6 @@
   "dependencies": {
     "@actions/core": "^1.9.0",
     "@actions/github": "^5.0.3",
-    "@oclif/core": "^1.24.2",
     "@octokit/action": "^4.0.4",
     "parse-diff": "^0.9.0",
     "path": "^0.12.7",
@@ -19,6 +18,9 @@
     "prettier": "2.8.2",
     "rimraf": "3.0.2",
     "typescript": "^4.9.4"
+  },
+  "overrides": {
+    "@oclif/core": "^1.24.2"
   },
   "scripts": {
     "build": "npm run test && npm run tsc && rimraf dist && esbuild src/index.ts --outfile=dist/index.js --bundle --platform=node --target=node16 --minify --sourcemap",

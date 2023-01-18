@@ -25,7 +25,7 @@ describe("Git action tests", () => {
 
   it("adds remote origin & properly points PR args to git remotes", async () => {
     try {
-      git.removeRemote("destination");
+      await git.removeRemote("destination");
     } catch (_) {
       // no-op
     }
@@ -39,6 +39,6 @@ describe("Git action tests", () => {
     expect(
       (await git.getRemotes()).filter((remote) => remote.name === "destination")
     ).toBeTruthy();
-    git.removeRemote("destination");
+    await git.removeRemote("destination");
   });
 });

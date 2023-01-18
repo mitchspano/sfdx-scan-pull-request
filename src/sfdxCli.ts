@@ -54,6 +54,10 @@ const cli = async <T>(cliArgs: string[]) => {
 export async function scanFiles(
   scannerFlags: ScannerFlags
 ): Promise<ScannerFinding[]> {
+  // TODO - local testing on different computers has shown that the below only works
+  // when SFDX scanner is already installed - need a test that performs the below command
+  // plugins:install @salesforce/sfdx-scanner
+  // when scanner:run --help doesn't work
   const scannerCliArgs = (
     Object.keys(scannerFlags) as Array<keyof ScannerFlags>
   )
