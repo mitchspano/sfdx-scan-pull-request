@@ -19,6 +19,10 @@ export type ScannerFlags = {
   tsConfig?: string;
 };
 
+type InternalScannerFlags = ScannerFlags & {
+  outfile: string;
+};
+
 export type ScannerViolation = {
   category: string;
   column: string;
@@ -41,7 +45,7 @@ const cli = async <T>(cliArgs: string[]) => {
   // create a copy of what the current argv's are to reset to later
   // the CLI parses everything after the 2nd argument as "stuff that gets passed to SFDX"
   const originalArgv = [...process.argv];
-  process.argv = ["node", "unused", ...cliArgs];
+  process.argv = ["node", "unused", ...cliArgs, "--json"];
 
   // this is currently a void method, which is a bit unfortunate as the "run" function
   // retains the response returned by any sub-command until the penultimate moment
@@ -57,18 +61,21 @@ const cli = async <T>(cliArgs: string[]) => {
 export async function scanFiles(
   scannerFlags: ScannerFlags
 ): Promise<ScannerFinding[]> {
+  const internalScannerFlags = {
+    outfile: FINDINGS_OUTPUT,
+    ...scannerFlags,
+  };
   const scannerCliArgs = (
-    Object.keys(scannerFlags) as Array<keyof ScannerFlags>
-  ).map(
-    (key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}"` : ""}`
-  );
-  await cli([
-    "scanner:run",
-    "--json",
-    "--outfile",
-    FINDINGS_OUTPUT,
-    ...scannerCliArgs,
-  ]);
+    Object.keys(internalScannerFlags) as Array<keyof InternalScannerFlags>
+  )
+    .map<string[]>((key) =>
+      internalScannerFlags[key]
+        ? ([`--${key}`, internalScannerFlags[key]] as string[])
+        : []
+    )
+    .reduce((acc, [one, two]) => (one && two ? [...acc, one, two] : acc), []);
+
+  await cli(["scanner:run", ...scannerCliArgs]);
 
   return new Promise((resolve) => {
     readFile(FINDINGS_OUTPUT, (_, data) => {
