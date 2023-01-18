@@ -4,10 +4,10 @@ import { writeFileSync, unlinkSync } from "fs";
 
 import { git, getDiffInPullRequest } from "../src/git-actions";
 
-const testFilePath = "github-test-file";
-
 describe("Git action tests", () => {
   it("returns diff info successfully", async () => {
+    const testFilePath = "github-test-file";
+
     writeFileSync(testFilePath, "some data to write");
     git.add(testFilePath);
 
@@ -24,6 +24,11 @@ describe("Git action tests", () => {
   });
 
   it("adds remote origin & properly points PR args to git remotes", async () => {
+    try {
+      git.removeRemote("destination");
+    } catch (_) {
+      // no-op
+    }
     const pullRequestArgs = ["main", "main"];
 
     await getDiffInPullRequest(

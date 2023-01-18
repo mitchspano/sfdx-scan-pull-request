@@ -1,7 +1,4 @@
 import * as sfdxCli from "sfdx-cli/dist/cli";
-import { readFile } from "fs";
-
-export const FINDINGS_OUTPUT = "sfdx-scanner-findings.json";
 
 export type ScannerFinding = {
   fileName: string;
@@ -17,10 +14,6 @@ export type ScannerFlags = {
   pmdconfig?: string;
   target: string;
   tsConfig?: string;
-};
-
-type InternalScannerFlags = ScannerFlags & {
-  outfile: string;
 };
 
 export type ScannerViolation = {
@@ -61,25 +54,13 @@ const cli = async <T>(cliArgs: string[]) => {
 export async function scanFiles(
   scannerFlags: ScannerFlags
 ): Promise<ScannerFinding[]> {
-  const internalScannerFlags = {
-    outfile: FINDINGS_OUTPUT,
-    ...scannerFlags,
-  };
   const scannerCliArgs = (
-    Object.keys(internalScannerFlags) as Array<keyof InternalScannerFlags>
+    Object.keys(scannerFlags) as Array<keyof ScannerFlags>
   )
     .map<string[]>((key) =>
-      internalScannerFlags[key]
-        ? ([`--${key}`, internalScannerFlags[key]] as string[])
-        : []
+      scannerFlags[key] ? ([`--${key}`, scannerFlags[key]] as string[]) : []
     )
     .reduce((acc, [one, two]) => (one && two ? [...acc, one, two] : acc), []);
 
-  await cli(["scanner:run", ...scannerCliArgs]);
-
-  return new Promise((resolve) => {
-    readFile(FINDINGS_OUTPUT, (_, data) => {
-      resolve(JSON.parse(data.toString()));
-    });
-  });
+  return cli<ScannerFinding[]>(["scanner:run", ...scannerCliArgs]);
 }
