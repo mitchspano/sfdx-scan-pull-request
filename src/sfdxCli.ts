@@ -30,6 +30,10 @@ export type ScannerViolation = {
 
 export type ScannerViolationType = "Error" | "Warning";
 
+type SfdxPlugin = {
+  name: string;
+};
+
 const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
   const currentCliVersion: string = require("../package.json").dependencies[
     "sfdx-cli"
@@ -38,11 +42,15 @@ const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
   // create a copy of what the current argv's are to reset to later
   // the CLI parses everything after the 2nd argument as "stuff that gets passed to SFDX"
   const originalArgv = [...process.argv];
-  process.argv = ["node", "unused", commandName, ...cliArgs, "--json"];
+  process.argv = ["node", "unused", commandName, ...cliArgs];
 
-  const result = (await sfdxCli.create(currentCliVersion, "stable").run()) as T;
-
-  process.argv = originalArgv;
+  let result = null as T;
+  try {
+    result = (await sfdxCli.create(currentCliVersion, "stable").run()) as T;
+  } catch (_) {
+  } finally {
+    process.argv = originalArgv;
+  }
   return result;
 };
 
@@ -50,17 +58,16 @@ export async function scanFiles(
   scannerFlags: ScannerFlags
 ): Promise<ScannerFinding[]> {
   const scanCommandName = "scanner:run";
-  try {
-    await cli<string>(scanCommandName, ["--help"]);
-  } catch (err: unknown) {
-    if (
-      err instanceof Error &&
-      err.message === `Command ${scanCommandName} not found`
-    ) {
-      // scanner isn't installed! let's proceed with the installation to fix https://github.com/mitchspano/sfdx-scan-pull-request/issues/4
-    }
-  }
+  const scannerPluginName = "@salesforce/sfdx-scanner";
 
+  const plugins = await cli<SfdxPlugin[]>("plugins");
+  const matchedPlugin = plugins.find(
+    (plugin) => plugin.name === scannerPluginName
+  );
+  if (!matchedPlugin) {
+    // scanner isn't installed! let's proceed with the installation
+    await cli("plugins:link", [`node_modules/${scannerPluginName}`]);
+  }
   const scannerCliArgs = (
     Object.keys(scannerFlags) as Array<keyof ScannerFlags>
   )
@@ -69,5 +76,5 @@ export async function scanFiles(
     )
     .reduce((acc, [one, two]) => (one && two ? [...acc, one, two] : acc), []);
 
-  return cli<ScannerFinding[]>(scanCommandName, scannerCliArgs);
+  return cli<ScannerFinding[]>(scanCommandName, [...scannerCliArgs, "--json"]);
 }

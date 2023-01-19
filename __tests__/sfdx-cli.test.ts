@@ -9,15 +9,25 @@ import { scanFiles } from "../src/sfdxCli";
  * to complete scans, using 30 seconds for now as a safe buffer
  */
 jest.useFakeTimers();
-jest.setTimeout(30000);
+jest.setTimeout(1000 * 30);
+
+const scannerFlags = {
+  engine: "pmd",
+  pmdconfig: undefined,
+  target: path.join(process.cwd(), "__tests__/ExampleClass.cls"),
+};
+
+jest.mock("@oclif/core/lib/errors/logger", () => {
+  return {
+    Logger: class Logger {
+      log = jest.fn();
+      flush = jest.fn().mockResolvedValue("");
+    },
+  };
+});
 
 describe("CLI tests!", () => {
   it("reports violations successfully", async () => {
-    const scannerFlags = {
-      engine: "pmd",
-      pmdconfig: undefined,
-      target: path.join(process.cwd(), "__tests__/ExampleClass.cls"),
-    };
     const findings = await scanFiles(scannerFlags);
     expect(findings).toBeTruthy();
 

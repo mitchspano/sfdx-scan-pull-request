@@ -3,3 +3,4 @@ lib
 coverage
 .sfdx
 .sf
+*-diagnosis.json
