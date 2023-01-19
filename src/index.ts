@@ -194,8 +194,6 @@ function filterFindingsToDiffScope(
 
 /**
  * @description Determines if all lines within a violation have changed
- * @param {ScannerViolation} violation Violation from the sfdx scanner
- * @param {Set<number>} relevantLines Lines in the file which have changed
  * @returns Boolean
  */
 function isInChangedLines(
@@ -220,8 +218,6 @@ function isInChangedLines(
 /**
  * @description Translates a violation object into a comment
  * with a formatted body
- * @param {Violation} violation Violation from the sfdx scanner
- * @param {String} engine Engine from the sfdx scanner
  * @returns Comment
  */
 function translateViolationToComment(
@@ -255,8 +251,6 @@ function translateViolationToComment(
 
 /**
  * @description Calculates if a violation will cause halting or not.
- * @param {Violation} violation Violation from the sfdx scanner
- * @param {String} engine Engine from the sfdx scanner
  * @returns Boolean
  */
 function getScannerViolationType(

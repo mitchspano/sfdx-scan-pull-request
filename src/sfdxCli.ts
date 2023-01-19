@@ -1,4 +1,8 @@
 import * as sfdxCli from "sfdx-cli/dist/cli";
+import Run from "@salesforce/sfdx-scanner/lib/commands/scanner/run";
+import * as eslintStrat from "@salesforce/sfdx-scanner/lib/lib/eslint/TypescriptEslintStrategy";
+import * as espree from "espree";
+import { assert } from "console";
 
 export type ScannerFinding = {
   fileName: string;
@@ -57,6 +61,7 @@ const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
 export async function scanFiles(
   scannerFlags: ScannerFlags
 ): Promise<ScannerFinding[]> {
+  performTreeShakingChecks();
   const scanCommandName = "scanner:run";
   const scannerPluginName = "@salesforce/sfdx-scanner";
 
@@ -77,4 +82,12 @@ export async function scanFiles(
     .reduce((acc, [one, two]) => (one && two ? [...acc, one, two] : acc), []);
 
   return cli<ScannerFinding[]>(scanCommandName, [...scannerCliArgs, "--json"]);
+}
+
+function performTreeShakingChecks() {
+  // we have some indirect dependencies which, without explicit code references to them
+  // will fail to be bundled correctly
+  assert(typeof Run.run === "function");
+  assert(eslintStrat !== undefined);
+  assert(espree !== undefined);
 }

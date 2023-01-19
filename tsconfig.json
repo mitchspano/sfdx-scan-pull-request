@@ -10,5 +10,5 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "exclude": ["**/*.test.ts", "**.*.cls"]
+  "exclude": ["__tests__/**/"]
 }

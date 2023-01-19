@@ -11,12 +11,6 @@ import { scanFiles } from "../src/sfdxCli";
 jest.useFakeTimers();
 jest.setTimeout(1000 * 30);
 
-const scannerFlags = {
-  engine: "pmd",
-  pmdconfig: undefined,
-  target: path.join(process.cwd(), "__tests__/ExampleClass.cls"),
-};
-
 jest.mock("@oclif/core/lib/errors/logger", () => {
   return {
     Logger: class Logger {
@@ -27,7 +21,13 @@ jest.mock("@oclif/core/lib/errors/logger", () => {
 });
 
 describe("CLI tests!", () => {
-  it("reports violations successfully", async () => {
+  it("reports pmd violations successfully", async () => {
+    const scannerFlags = {
+      engine: "pmd",
+      pmdconfig: undefined,
+      target: path.join(process.cwd(), "__tests__/ExampleClass.cls"),
+    };
+
     const findings = await scanFiles(scannerFlags);
     expect(findings).toBeTruthy();
 
@@ -42,6 +42,23 @@ describe("CLI tests!", () => {
     expect(
       scannerViolations.find(
         (violation) => violation.ruleName === "EmptyStatementBlock"
+      )
+    ).toBeTruthy();
+  });
+
+  it("reports eslint violations successully", async () => {
+    const scannerFlags = {
+      engine: "eslint",
+      target: path.join(process.cwd(), "__tests__/example-lwc.js"),
+    };
+
+    const findings = await scanFiles(scannerFlags);
+    expect(findings).toBeTruthy();
+    expect(findings[0]?.violations.length).toBeGreaterThan(0);
+
+    expect(
+      findings[0].violations.filter(
+        (violation) => violation.ruleName === "no-console"
       )
     ).toBeTruthy();
   });

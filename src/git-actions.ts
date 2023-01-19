@@ -36,16 +36,13 @@ export async function getDiffInPullRequest(
   const diffString = await git.diff(diffArgs);
   const files = parse(diffString);
 
-  const typesOfInterest = new Set<ChangeType>().add("add").add("del");
   for (let file of files) {
     if (file.to && file.to !== "/dev/null") {
       const changedLines = new Set<number>();
       for (let chunk of file.chunks) {
         for (let change of chunk.changes) {
-          if (typesOfInterest.has(change.type)) {
-            changedLines.add(
-              ((change as AddChange) || (change as DeleteChange)).ln
-            );
+          if (change.type === "add" || change.type === "del") {
+            changedLines.add(change.ln);
           }
         }
       }
