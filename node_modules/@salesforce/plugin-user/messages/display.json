@@ -1,7 +1,0 @@
-{
-  "description": "displays information about a user of a scratch org\nOutput includes the profile name, org ID, access token, instance URL, login URL, and alias if applicable.",
-  "examples": ["$ sfdx force:user:display", "$ sfdx force:user:display -u me@my.org --json"],
-  "accessTokenError": "This command doesn't accept an access token for a username.",
-  "accessTokenAction": "Specify a username or an alias.",
-  "securityWarning": "This command will expose sensitive information that allows for subsequent activity using your current authenticated session.\nSharing this information is equivalent to logging someone in under the current credential, resulting in unintended access and escalation of privilege.\nFor additional information, please review the authorization section of the https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_auth_web_flow.htm"
-}

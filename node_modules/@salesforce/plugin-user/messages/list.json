@@ -1,8 +1,0 @@
-{
-  "description": "list all authenticated users of an org\nThe original scratch org admin is marked with \"(A)\"",
-  "examples": [
-    "$ sfdx force:user:list",
-    "$ sfdx force:user:list -u me@my.org --json",
-    "$ sfdx force:user:list --json > tmp/MyUserList.json"
-  ]
-}

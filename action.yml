@@ -19,4 +19,4 @@ inputs:
     description: "Location of tsconfig.json file."
 runs:
   using: "node16"
-  main: "index.js"
+  main: "dist/index.js"
