@@ -1,7 +1,5 @@
-import * as sfdxCli from "sfdx-cli/dist/cli";
+import { create } from "sfdx-cli/dist/cli";
 import Run from "@salesforce/sfdx-scanner/lib/commands/scanner/run";
-import * as eslintStrat from "@salesforce/sfdx-scanner/lib/lib/eslint/TypescriptEslintStrategy";
-import * as espree from "espree";
 import { assert } from "console";
 
 export type ScannerFinding = {
@@ -50,7 +48,7 @@ const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
 
   let result = null as T;
   try {
-    result = (await sfdxCli.create(currentCliVersion, "stable").run()) as T;
+    result = (await create(currentCliVersion, "stable").run()) as T;
   } catch (_) {
   } finally {
     process.argv = originalArgv;
@@ -88,6 +86,4 @@ function performTreeShakingChecks() {
   // we have some indirect dependencies which, without explicit code references to them
   // will fail to be bundled correctly
   assert(typeof Run.run === "function");
-  assert(eslintStrat !== undefined);
-  assert(espree !== undefined);
 }

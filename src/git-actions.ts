@@ -1,4 +1,4 @@
-import parse, { AddChange, ChangeType, DeleteChange } from "parse-diff";
+import parse from "parse-diff";
 import { simpleGit } from "simple-git";
 import { context } from "@actions/github";
 

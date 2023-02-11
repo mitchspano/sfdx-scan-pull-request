@@ -4,3 +4,5 @@ coverage
 .sfdx
 .sf
 *-diagnosis.json
+# meta.js can be produced by the "npm run esbuild", and can be visually analyzed using https://esbuild.github.io/analyze/
+meta.js
