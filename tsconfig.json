@@ -6,9 +6,11 @@
     "outDir": "./lib",
     "rootDir": "./src",
     "strict": true,
+    "skipLibCheck": true,
     "target": "es6",
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "exclude": ["__tests__/**/"]
+  "include": ["src/*.ts"],
+  "exclude": ["__tests__/**/", "node_modules/**"]
 }

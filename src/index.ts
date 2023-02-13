@@ -73,7 +73,7 @@ function initialSetup() {
   };
   return {
     inputs,
-    pullRequest: github.context.payload.pull_request,
+    pullRequest: github?.context?.payload?.pull_request,
     scannerFlags,
   };
 }
@@ -326,6 +326,7 @@ function matchComment(commentA: GithubComment, commentB: GithubComment) {
  * @description Main method - injection point for code execution
  */
 async function main() {
+  console.log("Beginning sfdx-scan-pull-request run...");
   const { inputs, pullRequest, scannerFlags } = initialSetup();
   validatePullRequestContext(pullRequest);
 
@@ -356,4 +357,6 @@ async function main() {
   );
 }
 
-main();
+main().catch((error: Error) =>
+  setFailed(`Error occurred while running action: ${error.message}`)
+);

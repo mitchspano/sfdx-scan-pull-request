@@ -1,8 +1,8 @@
 node_modules
-lib
+lib/git-actions.js
+lib/index.js
+lib/sfdxCli.js
 coverage
 .sfdx
 .sf
 *-diagnosis.json
-# meta.js can be produced by the "npm run esbuild", and can be visually analyzed using https://esbuild.github.io/analyze/
-meta.js

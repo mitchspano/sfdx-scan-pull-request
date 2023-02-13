@@ -11,15 +11,6 @@ import { scanFiles } from "../src/sfdxCli";
 jest.useFakeTimers();
 jest.setTimeout(1000 * 30);
 
-jest.mock("@oclif/core/lib/errors/logger", () => {
-  return {
-    Logger: class Logger {
-      log = jest.fn();
-      flush = jest.fn().mockResolvedValue("");
-    },
-  };
-});
-
 describe("CLI tests!", () => {
   it("reports pmd violations successfully", async () => {
     const scannerFlags = {

@@ -1,6 +1,17 @@
-import { create } from "sfdx-cli/dist/cli";
-import Run from "@salesforce/sfdx-scanner/lib/commands/scanner/run";
-import { assert } from "console";
+/*
+   Copyright 2022 Mitch Spano
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+	 https://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+ */
+
+import { execSync } from "child_process";
 
 export type ScannerFinding = {
   fileName: string;
@@ -32,26 +43,20 @@ export type ScannerViolation = {
 
 export type ScannerViolationType = "Error" | "Warning";
 
-type SfdxPlugin = {
-  name: string;
+type SfdxCommandResult<T> = {
+  status: 1 | 0;
+  result: T;
 };
 
 const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
-  const currentCliVersion: string = require("../package.json").dependencies[
-    "sfdx-cli"
-  ].replace(/>(|=)|~|\^/, "");
-
-  // create a copy of what the current argv's are to reset to later
-  // the CLI parses everything after the 2nd argument as "stuff that gets passed to SFDX"
-  const originalArgv = [...process.argv];
-  process.argv = ["node", "unused", commandName, ...cliArgs];
-
   let result = null as T;
   try {
-    result = (await create(currentCliVersion, "stable").run()) as T;
-  } catch (_) {
-  } finally {
-    process.argv = originalArgv;
+    const cliCommand = `sfdx ${commandName} ${cliArgs.join(" ")}`;
+    result = (
+      JSON.parse(execSync(cliCommand).toString()) as SfdxCommandResult<T>
+    ).result;
+  } catch (err) {
+    throw err;
   }
   return result;
 };
@@ -59,18 +64,6 @@ const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
 export async function scanFiles(
   scannerFlags: ScannerFlags
 ): Promise<ScannerFinding[]> {
-  performTreeShakingChecks();
-  const scanCommandName = "scanner:run";
-  const scannerPluginName = "@salesforce/sfdx-scanner";
-
-  const plugins = await cli<SfdxPlugin[]>("plugins");
-  const matchedPlugin = plugins.find(
-    (plugin) => plugin.name === scannerPluginName
-  );
-  if (!matchedPlugin) {
-    // scanner isn't installed! let's proceed with the installation
-    await cli("plugins:link", [`node_modules/${scannerPluginName}`]);
-  }
   const scannerCliArgs = (
     Object.keys(scannerFlags) as Array<keyof ScannerFlags>
   )
@@ -79,11 +72,5 @@ export async function scanFiles(
     )
     .reduce((acc, [one, two]) => (one && two ? [...acc, one, two] : acc), []);
 
-  return cli<ScannerFinding[]>(scanCommandName, [...scannerCliArgs, "--json"]);
-}
-
-function performTreeShakingChecks() {
-  // we have some indirect dependencies which, without explicit code references to them
-  // will fail to be bundled correctly
-  assert(typeof Run.run === "function");
+  return cli<ScannerFinding[]>("scanner:run", [...scannerCliArgs, "--json"]);
 }
