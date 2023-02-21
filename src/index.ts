@@ -14,7 +14,7 @@
 import { getInput, setFailed } from "@actions/core";
 import { Octokit } from "@octokit/action";
 import copy from "recursive-copy";
-import github, { context } from "@actions/github";
+import { context } from "@actions/github";
 import { join } from "path";
 
 import { getDiffInPullRequest, GithubPullRequest } from "./git-actions";
@@ -73,7 +73,7 @@ function initialSetup() {
   };
   return {
     inputs,
-    pullRequest: github?.context?.payload?.pull_request,
+    pullRequest: context?.payload?.pull_request,
     scannerFlags,
   };
 }
