@@ -94,10 +94,9 @@ function getGithubRestApiClient(
 function validatePullRequestContext(pullRequest: GithubPullRequest) {
   console.log("Validating that this action was invoked from a pull request...");
   if (!pullRequest) {
-    setFailed(
+    throw new Error(
       "This action is only applicable when invoked in the context of a pull request."
     );
-    process.exit();
   }
 }
 
@@ -113,8 +112,6 @@ async function recursivelyMoveFilesToTempFolder(
   for (let file of filesWithChanges) {
     await copy(file, join(TEMP_DIR_NAME, file), {
       overwrite: true,
-    }).catch((error: Error) => {
-      setFailed("Copy failed: " + error);
     });
   }
   return filePathToChangedLines;
@@ -310,7 +307,7 @@ async function writeComments(
     }
   }
   if (hasHaltingError === true) {
-    setFailed("A serious error has been identified");
+    throw new Error("A serious error has been identified");
   }
 }
 
@@ -357,6 +354,7 @@ async function main() {
   );
 }
 
-main().catch((error: Error) =>
-  setFailed(`Error occurred while running action: ${error.message}`)
-);
+main().catch((error: Error) => {
+  setFailed(`Error occurred while running action: ${error.message}`);
+  process.exit();
+});
