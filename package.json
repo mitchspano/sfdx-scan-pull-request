@@ -29,6 +29,7 @@
   "scripts": {
     "build": "npm run test && npm run tsc && npm run ncc",
     "ncc": "ncc build lib/index.js -m",
+    "runLocally": "echo act must be installed for this to work && act pull_request -W __tests__/example-action.yml --input pmdconfig=__tests__/pmd-ruleset.xml --input severity-threshold=3 --eventpath __tests__/example-github-event.json",
     "test": "jest --coverage",
     "tsc": "tsc"
   }
