@@ -1,11 +1,11 @@
-import { ERROR, isHaltingViolation, RIGHT, WARNING } from "./index";
+const { ERROR, RIGHT, WARNING } = require("./common");
 
 const core = require("@actions/core");
 
 const COMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
 | --- | --- | --- | --- | --- |`;
 
-export class Comments {
+class Comments {
   constructor({ gitHubRestApiClient, comments, inputs }) {
     this.gitHubRestApiClient = gitHubRestApiClient;
     this.comments = comments;
@@ -65,14 +65,7 @@ export class Comments {
    * @returns Comment
    */
   translate(filePath, violation, engine) {
-    let type = isHaltingViolation(
-      violation,
-      engine,
-      this.inputs.severityThreshold,
-      this.inputs.strictlyEnforcedRules
-    )
-      ? ERROR
-      : WARNING;
+    let type = violation.isHalting ? ERROR : WARNING;
     if (type == ERROR) {
       this.hasHaltingError = true;
     }
@@ -97,3 +90,5 @@ export class Comments {
     };
   }
 }
+
+module.exports = { Comments };

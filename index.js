@@ -26,9 +26,6 @@ const DIFF_OUTPUT = "diffBetweenCurrentAndParentBranch.txt";
 
 const FINDINGS_OUTPUT = "sfdx-scanner-findings.json";
 const TEMP_DIR_NAME = "temporary";
-export const WARNING = "Warning";
-export const ERROR = "Error";
-export const RIGHT = "RIGHT";
 
 const TYPES_OF_INTEREST = new Set().add("add").add("delete");
 
@@ -191,6 +188,7 @@ function filterFindingsToDiffScope() {
         if (!filePathToComments[filePath]) {
           filePathToComments[filePath] = [];
         }
+        violation.isHalting = isHaltingViolation(violation, finding.engine);
         this.publisher.translate(filePath, violation, finding.engine);
       }
     }
@@ -225,16 +223,14 @@ function isInChangedLines(violation, relevantLines) {
  * @param {String} engine Engine from the sfdx scanner
  * @returns Boolean
  */
-export function isHaltingViolation(
-  violation,
-  engine,
-  severityThreshold,
-  strictlyEnforcedRules
-) {
-  if (severityThreshold && severityThreshold <= violation.severity) {
+function isHaltingViolation(violation, engine) {
+  if (
+    this.inputs.severityThreshold &&
+    this.inputs.severityThreshold <= violation.severity
+  ) {
     return true;
   }
-  if (!strictlyEnforcedRules) {
+  if (!this.inputs.strictlyEnforcedRules) {
     return false;
   }
   let violationDetail = {
@@ -242,7 +238,7 @@ export function isHaltingViolation(
     category: violation.category,
     rule: violation.ruleName,
   };
-  for (let enforcedRule of JSON.parse(strictlyEnforcedRules)) {
+  for (let enforcedRule of JSON.parse(this.inputs.strictlyEnforcedRules)) {
     if (
       Object.entries(violationDetail).toString() ===
       Object.entries(enforcedRule).toString()

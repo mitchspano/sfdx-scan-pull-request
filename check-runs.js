@@ -1,6 +1,6 @@
-import { ERROR, isHaltingViolation, RIGHT, WARNING } from "./index";
+const { ERROR, RIGHT, WARNING } = require("./common");
 
-export class CheckRuns {
+class CheckRuns {
   constructor({ gitHubRestApiClient, comments, inputs }) {
     this.gitHubRestApiClient = gitHubRestApiClient;
     this.comments = comments;
@@ -12,7 +12,7 @@ export class CheckRuns {
     console.log("Creating Check Runs using GitHub REST API...");
     const { octokit, owner, repo } = this.gitHubRestApiClient;
 
-    const method = `POST /repos/${owner}/${repo}/check-runs`; // /repos/{owner}/{repo}/check-runs
+    const method = `POST /repos/${owner}/${repo}/check-runs`;
     const annotations = Object.values(this.comments).flat();
 
     if (annotations) {
@@ -40,7 +40,7 @@ export class CheckRuns {
    * @returns Comment
    */
   translate(filePath, violation, engine) {
-    let type = isHaltingViolation(violation, engine) ? ERROR : WARNING;
+    let type = violation.isHalting ? ERROR : WARNING;
     if (type === ERROR) {
       this.hasHaltingError = true;
     }
@@ -62,3 +62,5 @@ export class CheckRuns {
     };
   }
 }
+
+module.exports = { CheckRuns };
