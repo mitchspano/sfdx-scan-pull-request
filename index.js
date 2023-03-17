@@ -19,25 +19,25 @@ const fs = require("fs");
 const github = require("@actions/github");
 const parse = require("parse-diff");
 const path = require("path");
+const { CheckRuns } = require("./check-runs");
+const { Comments } = require("./comments");
 
-/*const COMMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
-| --- | --- | --- | --- | --- |`;*/
 const DIFF_OUTPUT = "diffBetweenCurrentAndParentBranch.txt";
-const ERROR = "Error";
-const FINDINGS_OUTPUT = "sfdx-scanner-findings.json";
-const RIGHT = "RIGHT";
-const TEMP_DIR_NAME = "temporary";
-const TYPES_OF_INTEREST = new Set().add("add").add("delete");
-const WARNING = "Warning";
 
-filePathToChangedLines = {};
-filePathToComments = {};
-existingComments = [];
-findings = [];
-inputs = {};
-hasHaltingError = false;
-pullRequest = {};
-scannerCliArgs = "";
+const FINDINGS_OUTPUT = "sfdx-scanner-findings.json";
+const TEMP_DIR_NAME = "temporary";
+export const WARNING = "Warning";
+export const ERROR = "Error";
+export const RIGHT = "RIGHT";
+
+const TYPES_OF_INTEREST = new Set().add("add").add("delete");
+
+const filePathToChangedLines = {};
+const filePathToComments = {};
+let findings = [];
+let inputs = {};
+let pullRequest = {};
+let scannerCliArgs = "";
 
 /**
  * @description Collects and verifies the inputs from the action context and metadata
@@ -45,7 +45,7 @@ scannerCliArgs = "";
  */
 function initialSetup() {
   // TODO: validate inputs
-  const inputs = {
+  inputs = {
     severityThreshold: core.getInput("severity-threshold"),
     strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
     category: core.getInput("category"),
@@ -55,6 +55,7 @@ function initialSetup() {
     pmdConfig: core.getInput("pmdconfig"),
     tsConfig: core.getInput("tsconfig"),
     commitSha: core.getInput("commit_sha"),
+    useComments: core.getInput("use-comments"),
   };
 
   let category = inputs.category ? `--category="${inputs.category}"` : "";
@@ -65,17 +66,25 @@ function initialSetup() {
     : "";
   let pmdConfig = inputs.pmdConfig ? `--pmdconfig="${inputs.pmdConfig}"` : "";
   let tsConfig = inputs.tsConfig ? `--tsconfig="${inputs.tsConfig}"` : "";
-  this.scannerCliArgs = `${category} ${engine} ${eslintEnv} ${eslintConfig} ${pmdConfig} ${tsConfig}`;
+  scannerCliArgs = `${category} ${engine} ${eslintEnv} ${eslintConfig} ${pmdConfig} ${tsConfig}`;
 
-  this.inputs = inputs;
-  this.pullRequest = github.context?.payload?.pull_request;
+  pullRequest = github.context?.payload?.pull_request;
+
+  const params = {
+    gitHubRestApiClient: getGithubRestApiClient(),
+    comments: filePathToComments,
+    inputs,
+  };
+  this.publisher = this.inputs.useComments
+    ? new Comments(params)
+    : new CheckRuns(params);
 }
 
 function getGithubRestApiClient() {
   const octokit = new Octokit();
-  const owner = this.pullRequest?.base?.repo?.owner?.login;
-  const repo = this.pullRequest?.base?.repo?.name;
-  const prNumber = this.pullRequest?.number;
+  const owner = pullRequest?.base?.repo?.owner?.login;
+  const repo = pullRequest?.base?.repo?.name;
+  const prNumber = pullRequest?.number;
   return { octokit, owner, prNumber, repo };
 }
 
@@ -84,7 +93,7 @@ function getGithubRestApiClient() {
  */
 function validatePullRequestContext() {
   console.log("Validating that this action was invoked from a pull request...");
-  if (!this.pullRequest) {
+  if (!pullRequest) {
     core.setFailed(
       "This action is only applicable when invoked in the context of a pull request."
     );
@@ -98,12 +107,10 @@ function validatePullRequestContext() {
  */
 function getDiffInPullRequest() {
   console.log("Getting difference within the pull request...");
-    execSync(
-    `git remote add -f destination ${this.pullRequest.base.repo.clone_url}`
-  );
+  execSync(`git remote add -f destination ${pullRequest.base.repo.clone_url}`);
   execSync(`git remote update`);
   execSync(
-    `git diff destination/${this.pullRequest?.base?.ref}...origin/${this.pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
+    `git diff destination/${pullRequest?.base?.ref}...origin/${pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
   );
   const files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
   for (let file of files) {
@@ -116,7 +123,7 @@ function getDiffInPullRequest() {
           }
         }
       }
-      this.filePathToChangedLines[file.to] = changedLines;
+      filePathToChangedLines[file.to] = changedLines;
     }
   }
 }
@@ -127,7 +134,7 @@ function getDiffInPullRequest() {
  */
 async function recursivelyMoveFilesToTempFolder() {
   console.log("Recursively moving all files to the temp folder...");
-  let filesWithChanges = Object.keys(this.filePathToChangedLines);
+  let filesWithChanges = Object.keys(filePathToChangedLines);
   for (let file of filesWithChanges) {
     await copy(file, path.join(TEMP_DIR_NAME, file), {
       overwrite: true,
@@ -136,14 +143,6 @@ async function recursivelyMoveFilesToTempFolder() {
     });
   }
 }
-
-/*async function getExistingComments() {
-  console.log("Getting existing comments using GitHub REST API...");
-  const { octokit, owner, prNumber, repo } = getGithubRestApiClient();
-
-  const method = `GET /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
-  this.existingComments = await octokit.paginate(method);
-}*/
 
 /**
  * @description Uses the sfdx scanner to run static code analysis on
@@ -154,7 +153,7 @@ function performStaticCodeAnalysisOnFilesInDiff() {
     "Performing static code analysis on all of the files in the difference..."
   );
   execSync(
-    `node_modules/sfdx-cli/bin/run scanner:run ${this.scannerCliArgs} \
+    `node_modules/sfdx-cli/bin/run scanner:run ${scannerCliArgs} \
     --format json \
     --target "${TEMP_DIR_NAME}" \
     --outfile "${FINDINGS_OUTPUT}"`
@@ -164,8 +163,8 @@ function performStaticCodeAnalysisOnFilesInDiff() {
     console.log("No files applicable files identified in the difference...");
     process.exit();
   }
-  this.findings = JSON.parse(fs.readFileSync(filePath));
-  for (let finding of this.findings) {
+  findings = JSON.parse(fs.readFileSync(filePath).toString());
+  for (let finding of findings) {
     finding.fileName = finding.fileName.replace(
       path.join(process.cwd(), TEMP_DIR_NAME),
       process.cwd()
@@ -183,17 +182,16 @@ function filterFindingsToDiffScope() {
   console.log(
     "Filtering the findings to just the lines which are part of the pull request..."
   );
+
   for (let finding of this.findings) {
     let filePath = finding.fileName.replace(process.cwd() + "/", "");
-    relevantLines = filePathToChangedLines[filePath];
+    let relevantLines = filePathToChangedLines[filePath];
     for (let violation of finding.violations) {
       if (isInChangedLines(violation, relevantLines)) {
         if (!filePathToComments[filePath]) {
           filePathToComments[filePath] = [];
         }
-        filePathToComments[filePath].push(
-          translateViolationToAnnotations(filePath, violation, finding.engine)
-        );
+        this.publisher.translate(filePath, violation, finding.engine);
       }
     }
   }
@@ -207,82 +205,18 @@ function filterFindingsToDiffScope() {
  */
 function isInChangedLines(violation, relevantLines) {
   if (!violation.endLine) {
-    return relevantLines && relevantLines.has(parseInt(violation.line));
+    return relevantLines && relevantLines.has(parseInt(violation.line, 10));
   }
   for (
     let i = parseInt(violation.line);
     i <= parseInt(violation.endLine);
     i++
   ) {
-    if (!relevantLines || relevantLines.has(i) == false) {
+    if (!relevantLines || relevantLines.has(i) === false) {
       return false;
     }
   }
   return true;
-}
-/*
-/!**
- * @description Translates a violation object into a comment
- * with a formatted body
- * @param {Violation} violation Violation from the sfdx scanner
- * @param {String} engine Engine from the sfdx scanner
- * @returns Comment
- *!/
-function translateViolationToComment(filePath, violation, engine) {
-  let type = isHaltingViolation(violation, engine) ? ERROR : WARNING;
-  if (type == ERROR) {
-    this.hasHaltingError = true;
-  }
-  let endLine = violation.endLine
-    ? parseInt(violation.endLine)
-    : parseInt(violation.line);
-  let startLine = parseInt(violation.line);
-  if (endLine == startLine) {
-    endLine++;
-  }
-  return {
-    commit_id: this.pullRequest?.head?.sha,
-    path: filePath,
-    start_line: startLine,
-    start_side: RIGHT,
-    side: RIGHT,
-    line: endLine,
-    start_line: startLine,
-    body: `${COMMMENT_HEADER}
-| ${engine} | ${violation.category} | ${violation.ruleName} | ${violation.severity} | ${type} |
-
-[${violation.message}](${violation.url})`,
-  };
-}*/
-
-/**
- * @description Translates a violation object into a comment
- * with a formatted body
- * @param {Violation} violation Violation from the sfdx scanner
- * @param {String} engine Engine from the sfdx scanner
- * @returns Comment
- */
-function translateViolationToAnnotations(filePath, violation, engine) {
-  let type = isHaltingViolation(violation, engine) ? ERROR : WARNING;
-  if (type == ERROR) {
-    this.hasHaltingError = true;
-  }
-  let endLine = violation.endLine
-    ? parseInt(violation.endLine)
-    : parseInt(violation.line);
-  let startLine = parseInt(violation.line);
-  if (endLine == startLine) {
-    endLine++;
-  }
-  return {
-    path: filePath,
-    start_side: RIGHT,
-    annotation_level: "notice",
-    start_line: startLine,
-    end_line: endLine,
-    message: `${violation.category} ${violation.message}\n${violation.url}`,
-    title: `${violation.ruleName} (sev: ${violation.severity})`,
-  };
 }
 
 /**
@@ -291,14 +225,16 @@ function translateViolationToAnnotations(filePath, violation, engine) {
  * @param {String} engine Engine from the sfdx scanner
  * @returns Boolean
  */
-function isHaltingViolation(violation, engine) {
-  if (
-    this.inputs.severityThreshold &&
-    this.inputs.severityThreshold <= violation.severity
-  ) {
+export function isHaltingViolation(
+  violation,
+  engine,
+  severityThreshold,
+  strictlyEnforcedRules
+) {
+  if (severityThreshold && severityThreshold <= violation.severity) {
     return true;
   }
-  if (!this.inputs.strictlyEnforcedRules) {
+  if (!strictlyEnforcedRules) {
     return false;
   }
   let violationDetail = {
@@ -306,7 +242,7 @@ function isHaltingViolation(violation, engine) {
     category: violation.category,
     rule: violation.ruleName,
   };
-  for (let enforcedRule of JSON.parse(this.inputs.strictlyEnforcedRules)) {
+  for (let enforcedRule of JSON.parse(strictlyEnforcedRules)) {
     if (
       Object.entries(violationDetail).toString() ===
       Object.entries(enforcedRule).toString()
@@ -317,46 +253,12 @@ function isHaltingViolation(violation, engine) {
   return false;
 }
 
-/**
- * @description Writes the relevant comments to the GitHub pull request.
- * Uses the octokit to post the comments to the PR.
- */
-async function writeComments() {
-  console.log("Writing comments using GitHub REST API...");
-  const { octokit, owner, repo } = getGithubRestApiClient();
-
-  const method = `POST /repos/${owner}/${repo}/check-runs`; // /repos/{owner}/{repo}/check-runs
-  console.log(this.filePathToComments);
-  console.log("this.inputs", this.inputs, core.getInput("commit_sha"));
-  const annotations = Object.values(this.filePathToComments).flat();
-
-  console.log(annotations);
-  if (annotations) {
-    const request = {
-      name: "sfdx-scanner",
-      head_sha: this.inputs.commitSha,
-      status: "completed",
-      conclusion: "neutral",
-      output: {
-        title: "Results from sfdx-scanner",
-        summary: `${annotations.length} violations found`,
-        annotations: annotations,
-      },
-    };
-    console.log(request);
-    // console.log(process.env);
-    const result = await octokit.request(method, request);
-    console.log(result);
+async function writeToGitHub() {
+  await this.publisher.write();
+  if (this.publisher.hasHaltingError === true) {
+    core.setFailed("A serious error has been identified");
   }
 }
-
-/*function matchComment(commentA, commentB) {
-  return (
-    commentA.line === commentB.line &&
-    commentA.body === commentB.body &&
-    commentA.path === commentB.path
-  );
-}*/
 
 /**
  * @description Main method - injection point for code execution
@@ -367,9 +269,8 @@ async function main() {
   getDiffInPullRequest();
   await recursivelyMoveFilesToTempFolder();
   performStaticCodeAnalysisOnFilesInDiff();
-  // await getExistingComments();
   filterFindingsToDiffScope();
-  writeComments();
+  await writeToGitHub();
 }
 
 main();
