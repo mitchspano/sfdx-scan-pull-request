@@ -108,11 +108,11 @@ function getDiffInPullRequest() {
   execSync(`git remote update`);
   execSync(`git diff destination/${pullRequest?.base?.ref}...origin/${pullRequest?.head?.ref} > ${DIFF_OUTPUT}`);
   const files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
-  for (let file of files) {
+  for (const file of files) {
     if (fs.existsSync(file.to)) {
-      let changedLines = new Set();
-      for (let chunk of file.chunks) {
-        for (let change of chunk.changes) {
+      const changedLines = new Set();
+      for (const chunk of file.chunks) {
+        for (const change of chunk.changes) {
           if (TYPES_OF_INTEREST.has(change.type)) {
             changedLines.add(change.ln);
           }
@@ -130,7 +130,7 @@ function getDiffInPullRequest() {
 async function recursivelyMoveFilesToTempFolder() {
   console.log("Recursively moving all files to the temp folder...");
   const filesWithChanges = Object.keys(filePathToChangedLines);
-  for (let file of filesWithChanges) {
+  for (const file of filesWithChanges) {
     await copy(file, path.join(TEMP_DIR_NAME, file), {
       overwrite: true,
     }).catch(function (error) {
@@ -157,7 +157,7 @@ function performStaticCodeAnalysisOnFilesInDiff() {
     process.exit();
   }
   findings = JSON.parse(fs.readFileSync(filePath).toString());
-  for (let finding of findings) {
+  for (const finding of findings) {
     finding.fileName = finding.fileName.replace(path.join(process.cwd(), TEMP_DIR_NAME), process.cwd());
   }
 }
@@ -171,10 +171,10 @@ function performStaticCodeAnalysisOnFilesInDiff() {
 function filterFindingsToDiffScope() {
   console.log("Filtering the findings to just the lines which are part of the pull request...");
 
-  for (let finding of findings) {
+  for (const finding of findings) {
     const filePath = finding.fileName.replace(process.cwd() + "/", "");
     const relevantLines = filePathToChangedLines[filePath];
-    for (let violation of finding.violations) {
+    for (const violation of finding.violations) {
       if (isInChangedLines(violation, relevantLines)) {
         if (!filePathToComments[filePath]) {
           filePathToComments[filePath] = [];
@@ -217,12 +217,12 @@ function isHaltingViolation(violation, engine) {
   if (!inputs.strictlyEnforcedRules) {
     return false;
   }
-  let violationDetail = {
+  const violationDetail = {
     engine: engine,
     category: violation.category,
     rule: violation.ruleName,
   };
-  for (let enforcedRule of JSON.parse(inputs.strictlyEnforcedRules)) {
+  for (const enforcedRule of JSON.parse(inputs.strictlyEnforcedRules)) {
     if (Object.entries(violationDetail).toString() === Object.entries(enforcedRule).toString()) {
       return true;
     }
