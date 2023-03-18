@@ -6,7 +6,7 @@ const COMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
 | --- | --- | --- | --- | --- |`;
 
 class Comments {
-  constructor({ gitHubRestApiClient }) {
+  constructor({ gitHubRestApiClient, pullRequest }) {
     this.gitHubRestApiClient = gitHubRestApiClient;
     this.hasHaltingError = false;
     this.comments = [];

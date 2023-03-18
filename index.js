@@ -70,8 +70,8 @@ function initialSetup() {
 
   const params = {
     gitHubRestApiClient: getGithubRestApiClient(),
-    comments: filePathToComments,
     inputs,
+    pullRequest
   };
   publisher = inputs.useComments ? new Comments(params) : new CheckRuns(params);
 }
