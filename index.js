@@ -52,7 +52,7 @@ function initialSetup() {
     pmdConfig: core.getInput("pmdconfig"),
     tsConfig: core.getInput("tsconfig"),
     commitSha: core.getInput("commit_sha"),
-    useComments: core.getInput("use-comments"),
+    useComments: core.getInput("use-comments") === 'true',
   };
 
   let category = inputs.category ? `--category="${inputs.category}"` : "";
