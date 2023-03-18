@@ -72,7 +72,7 @@ function initialSetup() {
     comments: filePathToComments,
     inputs,
   };
-  this.publisher = this.inputs.useComments
+  this.publisher = inputs.useComments
     ? new Comments(params)
     : new CheckRuns(params);
 }
