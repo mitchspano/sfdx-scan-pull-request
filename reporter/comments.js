@@ -1,4 +1,4 @@
-const { ERROR, RIGHT, WARNING } = require("./common");
+const { ERROR, RIGHT, WARNING } = require("../common");
 
 const core = require("@actions/core");
 
@@ -22,13 +22,11 @@ class Comments {
     console.log("Writing comments using GitHub REST API...");
     const { octokit, owner, prNumber, repo } = this.gitHubRestApiClient;
     const existingComments = await this.getExistingComments();
-    console.log({ existingComments });
+    console.log(JSON.stringify({ existingComments }));
 
     for (let comment of this.comments) {
       console.log({ comment });
-      const existingComment = existingComments.find((existingComment) =>
-        this.matchComment(comment, existingComment)
-      );
+      const existingComment = existingComments.find((existingComment) => this.matchComment(comment, existingComment));
       if (!existingComment) {
         const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
         await octokit.request(method, comment);
@@ -51,10 +49,7 @@ class Comments {
     const { octokit, owner, repo } = this.gitHubRestApiClient;
     // Get all existing comments that are *not* in the new comments
     const resolvedComments = existingComments.filter(
-      (existingComment) =>
-        !newComments.find((newComment) =>
-          this.matchComment(existingComment, newComment)
-        )
+      (existingComment) => !newComments.find((newComment) => this.matchComment(existingComment, newComment))
     );
 
     for (let comment of resolvedComments) {
@@ -77,11 +72,7 @@ class Comments {
   }
 
   matchComment(commentA, commentB) {
-    return (
-      commentA.line === commentB.line &&
-      commentA.body === commentB.body &&
-      commentA.path === commentB.path
-    );
+    return commentA.line === commentB.line && commentA.body === commentB.body && commentA.path === commentB.path;
   }
 
   /**
@@ -97,9 +88,7 @@ class Comments {
     if (type === ERROR) {
       this.hasHaltingError = true;
     }
-    let endLine = violation.endLine
-      ? parseInt(violation.endLine)
-      : parseInt(violation.line);
+    let endLine = violation.endLine ? parseInt(violation.endLine) : parseInt(violation.line);
     let startLine = parseInt(violation.line);
     if (endLine === startLine) {
       endLine++;

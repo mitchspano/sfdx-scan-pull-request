@@ -19,8 +19,8 @@ const fs = require("fs");
 const github = require("@actions/github");
 const parse = require("parse-diff");
 const path = require("path");
-const { CheckRuns } = require("./check-runs");
-const { Comments } = require("./comments");
+const { CheckRuns } = require("./reporter/check-runs");
+const { Comments } = require("./reporter/comments");
 
 const DIFF_OUTPUT = "diffBetweenCurrentAndParentBranch.txt";
 
@@ -35,7 +35,7 @@ let findings = [];
 let inputs = {};
 let pullRequest = {};
 let scannerCliArgs = "";
-let publisher;
+let reporter;
 
 /**
  * @description Collects and verifies the inputs from the action context and metadata
@@ -54,16 +54,13 @@ function initialSetup() {
     tsConfig: core.getInput("tsconfig"),
     commitSha: core.getInput("commit_sha"),
     reportMode: core.getInput("report-mode") ?? "check-runs",
-    deleteResolvedComments:
-      core.getInput("delete-resolved-comments") === "true",
+    deleteResolvedComments: core.getInput("delete-resolved-comments") === "true",
   };
 
   let category = inputs.category ? `--category="${inputs.category}"` : "";
   let engine = inputs.engine ? `--engine="${inputs.engine}"` : "";
   let eslintEnv = inputs.eslintEnv ? `--env="${inputs.eslintEnv}"` : "";
-  let eslintConfig = inputs.eslintConfig
-    ? `--eslintconfig="${inputs.eslintConfig}"`
-    : "";
+  let eslintConfig = inputs.eslintConfig ? `--eslintconfig="${inputs.eslintConfig}"` : "";
   let pmdConfig = inputs.pmdConfig ? `--pmdconfig="${inputs.pmdConfig}"` : "";
   let tsConfig = inputs.tsConfig ? `--tsconfig="${inputs.tsConfig}"` : "";
   scannerCliArgs = `${category} ${engine} ${eslintEnv} ${eslintConfig} ${pmdConfig} ${tsConfig}`;
@@ -75,10 +72,7 @@ function initialSetup() {
     inputs,
     pullRequest,
   };
-  publisher =
-    inputs.reportMode === "comments"
-      ? new Comments(params)
-      : new CheckRuns(params);
+  reporter = inputs.reportMode === "comments" ? new Comments(params) : new CheckRuns(params);
 }
 
 function getGithubRestApiClient() {
@@ -95,9 +89,7 @@ function getGithubRestApiClient() {
 function validatePullRequestContext() {
   console.log("Validating that this action was invoked from a pull request...");
   if (!pullRequest) {
-    core.setFailed(
-      "This action is only applicable when invoked in the context of a pull request."
-    );
+    core.setFailed("This action is only applicable when invoked in the context of a pull request.");
     process.exit();
   }
 }
@@ -110,9 +102,7 @@ function getDiffInPullRequest() {
   console.log("Getting difference within the pull request...");
   execSync(`git remote add -f destination ${pullRequest.base.repo.clone_url}`);
   execSync(`git remote update`);
-  execSync(
-    `git diff destination/${pullRequest?.base?.ref}...origin/${pullRequest?.head?.ref} > ${DIFF_OUTPUT}`
-  );
+  execSync(`git diff destination/${pullRequest?.base?.ref}...origin/${pullRequest?.head?.ref} > ${DIFF_OUTPUT}`);
   const files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
   for (let file of files) {
     if (fs.existsSync(file.to)) {
@@ -150,9 +140,7 @@ async function recursivelyMoveFilesToTempFolder() {
  * all files within the temporary directory.
  */
 function performStaticCodeAnalysisOnFilesInDiff() {
-  console.log(
-    "Performing static code analysis on all of the files in the difference..."
-  );
+  console.log("Performing static code analysis on all of the files in the difference...");
   execSync(
     `node_modules/sfdx-cli/bin/run scanner:run ${scannerCliArgs} \
     --format json \
@@ -166,10 +154,7 @@ function performStaticCodeAnalysisOnFilesInDiff() {
   }
   findings = JSON.parse(fs.readFileSync(filePath).toString());
   for (let finding of findings) {
-    finding.fileName = finding.fileName.replace(
-      path.join(process.cwd(), TEMP_DIR_NAME),
-      process.cwd()
-    );
+    finding.fileName = finding.fileName.replace(path.join(process.cwd(), TEMP_DIR_NAME), process.cwd());
   }
 }
 
@@ -180,9 +165,7 @@ function performStaticCodeAnalysisOnFilesInDiff() {
  * object into a comment object.
  */
 function filterFindingsToDiffScope() {
-  console.log(
-    "Filtering the findings to just the lines which are part of the pull request..."
-  );
+  console.log("Filtering the findings to just the lines which are part of the pull request...");
 
   for (let finding of findings) {
     let filePath = finding.fileName.replace(process.cwd() + "/", "");
@@ -193,7 +176,7 @@ function filterFindingsToDiffScope() {
           filePathToComments[filePath] = [];
         }
         violation.isHalting = isHaltingViolation(violation, finding.engine);
-        publisher.translate(filePath, violation, finding.engine);
+        reporter.translate(filePath, violation, finding.engine);
       }
     }
   }
@@ -209,11 +192,7 @@ function isInChangedLines(violation, relevantLines) {
   if (!violation.endLine) {
     return relevantLines && relevantLines.has(parseInt(violation.line, 10));
   }
-  for (
-    let i = parseInt(violation.line);
-    i <= parseInt(violation.endLine);
-    i++
-  ) {
+  for (let i = parseInt(violation.line); i <= parseInt(violation.endLine); i++) {
     if (!relevantLines || relevantLines.has(i) === false) {
       return false;
     }
@@ -228,10 +207,7 @@ function isInChangedLines(violation, relevantLines) {
  * @returns Boolean
  */
 function isHaltingViolation(violation, engine) {
-  if (
-    inputs.severityThreshold &&
-    inputs.severityThreshold <= violation.severity
-  ) {
+  if (inputs.severityThreshold && inputs.severityThreshold <= violation.severity) {
     return true;
   }
   if (!inputs.strictlyEnforcedRules) {
@@ -243,10 +219,7 @@ function isHaltingViolation(violation, engine) {
     rule: violation.ruleName,
   };
   for (let enforcedRule of JSON.parse(inputs.strictlyEnforcedRules)) {
-    if (
-      Object.entries(violationDetail).toString() ===
-      Object.entries(enforcedRule).toString()
-    ) {
+    if (Object.entries(violationDetail).toString() === Object.entries(enforcedRule).toString()) {
       return true;
     }
   }
@@ -254,8 +227,8 @@ function isHaltingViolation(violation, engine) {
 }
 
 async function writeToGitHub() {
-  await publisher.write();
-  if (publisher.hasHaltingError === true) {
+  await reporter.write();
+  if (reporter.hasHaltingError === true) {
     core.setFailed("A serious error has been identified");
   }
 }

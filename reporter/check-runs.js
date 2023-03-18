@@ -1,4 +1,4 @@
-const { ERROR, RIGHT, WARNING } = require("./common");
+const { ERROR, RIGHT, WARNING } = require("../common");
 
 class CheckRuns {
   constructor({ gitHubRestApiClient, inputs }) {
@@ -51,9 +51,7 @@ class CheckRuns {
     if (type === ERROR) {
       this.hasHaltingError = true;
     }
-    let endLine = violation.endLine
-      ? parseInt(violation.endLine)
-      : parseInt(violation.line);
+    let endLine = violation.endLine ? parseInt(violation.endLine) : parseInt(violation.line);
     let startLine = parseInt(violation.line);
     if (endLine === startLine) {
       endLine++;
