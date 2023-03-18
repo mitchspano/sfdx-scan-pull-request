@@ -4,6 +4,7 @@ const core = require("@actions/core");
 
 const COMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
 | --- | --- | --- | --- | --- |`;
+const COMMENT_PREFIX = "sfdx-scanner:";
 
 class Comments {
   constructor({ gitHubRestApiClient, pullRequest, inputs }) {
@@ -68,7 +69,7 @@ class Comments {
     const { octokit, owner, prNumber, repo } = this.gitHubRestApiClient;
 
     const method = `GET /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
-    return await octokit.paginate(method);
+    return (await octokit.paginate(method)).filter((comment) => comment.body.includes(COMMENT_PREFIX));
   }
 
   matchComment(commentA, commentB) {
@@ -103,7 +104,7 @@ class Comments {
       body: `${COMMENT_HEADER}
 | ${engine} | ${violation.category} | ${violation.ruleName} | ${violation.severity} | ${type} |
 
-[${violation.message}](${violation.url})`,
+${COMMENT_PREFIX} [${violation.message}](${violation.url})`,
     });
   }
 }
