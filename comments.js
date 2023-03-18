@@ -18,7 +18,7 @@ class Comments {
    */
   async write() {
     console.log("Writing comments using GitHub REST API...");
-    const { octokit, owner, prNumber, repo } = this.gitHubRestApiClient();
+    const { octokit, owner, prNumber, repo } = this.gitHubRestApiClient;
     const existingComments = await this.getExistingComments();
 
     for (let comment of this.comments) {
