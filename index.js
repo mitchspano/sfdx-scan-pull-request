@@ -56,18 +56,20 @@ function initialSetup() {
     .map((key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}"` : ""}`)
     .join(" ");
 
+   pullRequest = github.context?.payload?.pull_request;
+  console.log({head: pullRequest?.head});
   inputs = {
     severityThreshold: core.getInput("severity-threshold"),
     strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
     eslintEnv: core.getInput("eslint-env"),
-    commitSha: core.getInput("commit-sha") ?? github.context?.payload?.pull_request?.head?.sha,
+    commitSha: core.getInput("commit-sha") ?? pullRequest?.head?.sha,
     reportMode: core.getInput("report-mode") ?? "check-runs",
     deleteResolvedComments: core.getInput("delete-resolved-comments") === "true",
   };
-  pullRequest = github.context?.payload?.pull_request;
 
   if (!inputs.commitSha && inputs.reportMode === "check-runs") {
     console.warn(`'commit-sha' parameter is required when using 'check-runs' reporting and cannot be determined from the head of the PR`);
+    console.warn(`Switching to reporting with comments`);
     inputs.reportMode = "comments";
   }
 
