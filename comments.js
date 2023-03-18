@@ -55,7 +55,7 @@ class Comments {
     console.log({ resolvedComments });
 
     for (let comment of resolvedComments) {
-      const method = `DELETE /repos/${owner}/${repo}/pulls/${prNumber}/comments/${comment.id}`;
+      const method = `DELETE /repos/${owner}/${repo}/pulls/comments/${comment.id}`;
       await octokit.request(method);
     }
   }
