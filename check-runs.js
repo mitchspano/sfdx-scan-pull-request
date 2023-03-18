@@ -5,7 +5,7 @@ class CheckRuns {
     this.gitHubRestApiClient = gitHubRestApiClient;
     this.inputs = inputs;
     this.hasHaltingError = false;
-    this.annotations = {};
+    this.annotations = [];
   }
 
   async write() {
