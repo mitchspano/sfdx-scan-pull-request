@@ -24,7 +24,7 @@ class Comments {
 
     for (let comment of this.comments) {
       // TODO: Add in resolving comments when the issue has been resolved?
-      console.log({comment});
+      console.log({ comment });
       const existingComment = existingComments.find((existingComment) =>
         this.matchComment(comment, existingComment)
       );
@@ -38,6 +38,25 @@ class Comments {
 
     if (this.hasHaltingError === true) {
       core.setFailed("A serious error has been identified");
+    }
+
+    await this.deleteResolvedComments(this.comments, existingComments);
+  }
+
+  // TODO: This should probably be behind a config
+  // Can only delete comments via REST instead of resolving
+  async deleteResolvedComments(newComments, existingComments) {
+    const { octokit, owner, prNumber, repo } = this.gitHubRestApiClient;
+    const resolvedComments = existingComments.filter((existingComment) =>
+      newComments.find((newComment) =>
+        this.matchComment(existingComment, newComment)
+      )
+    );
+    console.log({ resolvedComments });
+
+    for (let comment of resolvedComments) {
+      const method = `DELETE /repos/${owner}/${repo}/pulls/${prNumber}/comments/${comment.id}`;
+      await octokit.request(method);
     }
   }
 

@@ -71,7 +71,7 @@ function initialSetup() {
   const params = {
     gitHubRestApiClient: getGithubRestApiClient(),
     inputs,
-    pullRequest
+    pullRequest,
   };
   publisher = inputs.useComments ? new Comments(params) : new CheckRuns(params);
 }
