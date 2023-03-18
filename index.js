@@ -35,6 +35,7 @@ let findings = [];
 let inputs = {};
 let pullRequest = {};
 let scannerCliArgs = "";
+let publisher;
 
 /**
  * @description Collects and verifies the inputs from the action context and metadata
@@ -72,7 +73,7 @@ function initialSetup() {
     comments: filePathToComments,
     inputs,
   };
-  this.publisher = inputs.useComments
+  publisher = inputs.useComments
     ? new Comments(params)
     : new CheckRuns(params);
 }
@@ -189,7 +190,7 @@ function filterFindingsToDiffScope() {
           filePathToComments[filePath] = [];
         }
         violation.isHalting = isHaltingViolation(violation, finding.engine);
-        this.publisher.translate(filePath, violation, finding.engine);
+        publisher.translate(filePath, violation, finding.engine);
       }
     }
   }
@@ -225,12 +226,12 @@ function isInChangedLines(violation, relevantLines) {
  */
 function isHaltingViolation(violation, engine) {
   if (
-    this.inputs.severityThreshold &&
-    this.inputs.severityThreshold <= violation.severity
+    inputs.severityThreshold &&
+    inputs.severityThreshold <= violation.severity
   ) {
     return true;
   }
-  if (!this.inputs.strictlyEnforcedRules) {
+  if (!inputs.strictlyEnforcedRules) {
     return false;
   }
   let violationDetail = {
@@ -238,7 +239,7 @@ function isHaltingViolation(violation, engine) {
     category: violation.category,
     rule: violation.ruleName,
   };
-  for (let enforcedRule of JSON.parse(this.inputs.strictlyEnforcedRules)) {
+  for (let enforcedRule of JSON.parse(inputs.strictlyEnforcedRules)) {
     if (
       Object.entries(violationDetail).toString() ===
       Object.entries(enforcedRule).toString()
@@ -250,8 +251,8 @@ function isHaltingViolation(violation, engine) {
 }
 
 async function writeToGitHub() {
-  await this.publisher.write();
-  if (this.publisher.hasHaltingError === true) {
+  await publisher.write();
+  if (publisher.hasHaltingError === true) {
     core.setFailed("A serious error has been identified");
   }
 }
