@@ -23,6 +23,7 @@ class Comments {
 
     for (let comment of this.comments) {
       // TODO: Add in resolving comments when the issue has been resolved?
+      console.log({comment});
       const existingComment = existingComments.find((existingComment) =>
         this.matchComment(comment, existingComment)
       );
