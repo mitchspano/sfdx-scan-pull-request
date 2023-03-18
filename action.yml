@@ -18,7 +18,7 @@ inputs:
   tsconfig:
     description: "Location of tsconfig.json file."
   commit-sha:
-    description: "Commit sha"
+    description: "Override the head commit sha for the PR"
   report-mode:
     description: "Use comments or check-runs for reporting errors"
     default: 'check-runs'

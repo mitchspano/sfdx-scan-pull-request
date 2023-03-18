@@ -43,34 +43,32 @@ let reporter;
  */
 function initialSetup() {
   // TODO: validate inputs
+  const scannerFlags = {
+    category: core.getInput("category"),
+    engine: core.getInput("engine"),
+    env: core.getInput("eslint-env"),
+    eslintconfig: core.getInput("eslintconfig"),
+    pmdconfig: core.getInput("pmdconfig"),
+    tsConfig: core.getInput("tsconfig"),
+  };
+
+  scannerCliArgs = Object.keys(scannerFlags)
+    .map((key) => `${scannerFlags[key] ? `--${key}="${scannerFlags[key]}"` : ""}`)
+    .join(" ");
+
   inputs = {
     severityThreshold: core.getInput("severity-threshold"),
     strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
-    category: core.getInput("category"),
-    engine: core.getInput("engine"),
     eslintEnv: core.getInput("eslint-env"),
-    eslintConfig: core.getInput("eslintconfig"),
-    pmdConfig: core.getInput("pmdconfig"),
-    tsConfig: core.getInput("tsconfig"),
-    commitSha: core.getInput("commit-sha"),
+    commitSha: core.getInput("commit-sha") ?? github.context?.payload?.pull_request?.head?.sha,
     reportMode: core.getInput("report-mode") ?? "check-runs",
     deleteResolvedComments: core.getInput("delete-resolved-comments") === "true",
   };
-
-  let category = inputs.category ? `--category="${inputs.category}"` : "";
-  let engine = inputs.engine ? `--engine="${inputs.engine}"` : "";
-  let eslintEnv = inputs.eslintEnv ? `--env="${inputs.eslintEnv}"` : "";
-  let eslintConfig = inputs.eslintConfig ? `--eslintconfig="${inputs.eslintConfig}"` : "";
-  let pmdConfig = inputs.pmdConfig ? `--pmdconfig="${inputs.pmdConfig}"` : "";
-  let tsConfig = inputs.tsConfig ? `--tsconfig="${inputs.tsConfig}"` : "";
-  scannerCliArgs = `${category} ${engine} ${eslintEnv} ${eslintConfig} ${pmdConfig} ${tsConfig}`;
-
   pullRequest = github.context?.payload?.pull_request;
-  console.log(JSON.stringify(github?.context));
 
-  if (!inputs.commitSha && inputs.reportMode === 'check-runs') {
-    console.warn(`'commit-sha' parameter is required when using 'check-runs' reporting`);
-    inputs.reportMode = 'comments';
+  if (!inputs.commitSha && inputs.reportMode === "check-runs") {
+    console.warn(`'commit-sha' parameter is required when using 'check-runs' reporting and cannot be determined from the head of the PR`);
+    inputs.reportMode = "comments";
   }
 
   const params = {
@@ -131,7 +129,7 @@ function getDiffInPullRequest() {
  */
 async function recursivelyMoveFilesToTempFolder() {
   console.log("Recursively moving all files to the temp folder...");
-  let filesWithChanges = Object.keys(filePathToChangedLines);
+  const filesWithChanges = Object.keys(filePathToChangedLines);
   for (let file of filesWithChanges) {
     await copy(file, path.join(TEMP_DIR_NAME, file), {
       overwrite: true,
@@ -153,7 +151,7 @@ function performStaticCodeAnalysisOnFilesInDiff() {
     --target "${TEMP_DIR_NAME}" \
     --outfile "${FINDINGS_OUTPUT}"`
   );
-  let filePath = path.join(process.cwd(), FINDINGS_OUTPUT);
+  const filePath = path.join(process.cwd(), FINDINGS_OUTPUT);
   if (fs.existsSync(filePath) === false) {
     console.log("No files applicable files identified in the difference...");
     process.exit();
@@ -174,8 +172,8 @@ function filterFindingsToDiffScope() {
   console.log("Filtering the findings to just the lines which are part of the pull request...");
 
   for (let finding of findings) {
-    let filePath = finding.fileName.replace(process.cwd() + "/", "");
-    let relevantLines = filePathToChangedLines[filePath];
+    const filePath = finding.fileName.replace(process.cwd() + "/", "");
+    const relevantLines = filePathToChangedLines[filePath];
     for (let violation of finding.violations) {
       if (isInChangedLines(violation, relevantLines)) {
         if (!filePathToComments[filePath]) {
