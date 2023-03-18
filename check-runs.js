@@ -5,7 +5,7 @@ class CheckRuns {
     this.gitHubRestApiClient = gitHubRestApiClient;
     this.inputs = inputs;
     this.hasHaltingError = false;
-    this.violations = [];
+    this.annotations = {};
   }
 
   async write() {
@@ -13,16 +13,15 @@ class CheckRuns {
     const { octokit, owner, repo } = this.gitHubRestApiClient;
 
     const method = `POST /repos/${owner}/${repo}/check-runs`;
-    const annotations = Object.values(this.violations).flat();
 
     let conclusion;
     if (this.hasHaltingError) {
       conclusion = "failure";
     } else {
-      conclusion = this.violations.length === 0 ? "success" : "neutral";
+      conclusion = this.annotations.length === 0 ? "success" : "neutral";
     }
 
-    if (annotations) {
+    if (this.annotations) {
       const request = {
         name: "sfdx-scanner",
         head_sha: this.inputs.commitSha,
@@ -31,8 +30,8 @@ class CheckRuns {
         conclusion: conclusion,
         output: {
           title: "Results from sfdx-scanner",
-          summary: `${annotations.length} violations found`,
-          annotations: annotations,
+          summary: `${this.annotations.length} violations found`,
+          annotations: this.annotations,
         },
       };
 
@@ -59,7 +58,7 @@ class CheckRuns {
     if (endLine === startLine) {
       endLine++;
     }
-    this.violations.push({
+    this.annotations.push({
       path: filePath,
       start_side: RIGHT,
       annotation_level: "notice",
