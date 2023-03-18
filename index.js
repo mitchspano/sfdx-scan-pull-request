@@ -57,7 +57,7 @@ function initialSetup() {
     .join(" ");
 
    pullRequest = github.context?.payload?.pull_request;
-  console.log({head: pullRequest?.head});
+  console.log({sha: pullRequest?.head?.sha});
   inputs = {
     severityThreshold: core.getInput("severity-threshold"),
     strictlyEnforcedRules: core.getInput("strictly-enforced-rules"),
