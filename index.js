@@ -180,7 +180,7 @@ function filterFindingsToDiffScope() {
     "Filtering the findings to just the lines which are part of the pull request..."
   );
 
-  for (let finding of this.findings) {
+  for (let finding of findings) {
     let filePath = finding.fileName.replace(process.cwd() + "/", "");
     let relevantLines = filePathToChangedLines[filePath];
     for (let violation of finding.violations) {

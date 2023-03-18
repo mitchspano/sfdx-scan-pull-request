@@ -60,13 +60,14 @@ class Comments {
   /**
    * @description Translates a violation object into a comment
    * with a formatted body
+   * @param {string} filePath path to the file
    * @param {Violation} violation Violation from the sfdx scanner
    * @param {String} engine Engine from the sfdx scanner
    * @returns Comment
    */
   translate(filePath, violation, engine) {
     let type = violation.isHalting ? ERROR : WARNING;
-    if (type == ERROR) {
+    if (type === ERROR) {
       this.hasHaltingError = true;
     }
     let endLine = violation.endLine
