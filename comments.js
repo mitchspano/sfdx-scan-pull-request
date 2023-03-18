@@ -6,11 +6,12 @@ const COMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
 | --- | --- | --- | --- | --- |`;
 
 class Comments {
-  constructor({ gitHubRestApiClient, pullRequest }) {
+  constructor({ gitHubRestApiClient, pullRequest, inputs }) {
     this.gitHubRestApiClient = gitHubRestApiClient;
     this.hasHaltingError = false;
     this.comments = [];
     this.pullRequest = pullRequest;
+    this.inputs = inputs;
   }
 
   /**
@@ -21,9 +22,9 @@ class Comments {
     console.log("Writing comments using GitHub REST API...");
     const { octokit, owner, prNumber, repo } = this.gitHubRestApiClient;
     const existingComments = await this.getExistingComments();
+    console.log({ existingComments });
 
     for (let comment of this.comments) {
-      // TODO: Add in resolving comments when the issue has been resolved?
       console.log({ comment });
       const existingComment = existingComments.find((existingComment) =>
         this.matchComment(comment, existingComment)
@@ -40,24 +41,28 @@ class Comments {
       core.setFailed("A serious error has been identified");
     }
 
-    await this.deleteResolvedComments(this.comments, existingComments);
+    if (this.inputs.deleteResolvedComments) {
+      await this.deleteResolvedComments(this.comments, existingComments);
+    }
   }
 
-  // TODO: This should probably be behind a config
   // Can only delete comments via REST instead of resolving
   async deleteResolvedComments(newComments, existingComments) {
     const { octokit, owner, repo } = this.gitHubRestApiClient;
-    const resolvedComments = existingComments.filter((existingComment) =>
-      !newComments.find((newComment) =>
-        this.matchComment(existingComment, newComment)
-      )
+    // Get all existing comments that are *not* in the new comments
+    const resolvedComments = existingComments.filter(
+      (existingComment) =>
+        !newComments.find((newComment) =>
+          this.matchComment(existingComment, newComment)
+        )
     );
-    console.log({ resolvedComments });
 
     for (let comment of resolvedComments) {
       if (comment.id) {
+        console.log(
+          `Removing the comment because the issue appears to be resolved: Id: ${comment.id}, File: ${comment?.path}, Body: ${comment.body}`
+        );
         const method = `DELETE /repos/${owner}/${repo}/pulls/comments/${comment.id}`;
-        console.log(method);
         await octokit.request(method);
       }
     }

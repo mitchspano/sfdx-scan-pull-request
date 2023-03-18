@@ -53,7 +53,9 @@ function initialSetup() {
     pmdConfig: core.getInput("pmdconfig"),
     tsConfig: core.getInput("tsconfig"),
     commitSha: core.getInput("commit_sha"),
-    useComments: core.getInput("use-comments") === "true",
+    reportMode: core.getInput("report-mode") ?? "check-runs",
+    deleteResolvedComments:
+      core.getInput("delete-resolved-comments") === "true",
   };
 
   let category = inputs.category ? `--category="${inputs.category}"` : "";
@@ -73,7 +75,10 @@ function initialSetup() {
     inputs,
     pullRequest,
   };
-  publisher = inputs.useComments ? new Comments(params) : new CheckRuns(params);
+  publisher =
+    inputs.reportMode === "comments"
+      ? new Comments(params)
+      : new CheckRuns(params);
 }
 
 function getGithubRestApiClient() {
