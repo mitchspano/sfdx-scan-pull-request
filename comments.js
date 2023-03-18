@@ -46,17 +46,20 @@ class Comments {
   // TODO: This should probably be behind a config
   // Can only delete comments via REST instead of resolving
   async deleteResolvedComments(newComments, existingComments) {
-    const { octokit, owner, prNumber, repo } = this.gitHubRestApiClient;
+    const { octokit, owner, repo } = this.gitHubRestApiClient;
     const resolvedComments = existingComments.filter((existingComment) =>
-      newComments.find((newComment) =>
+      !newComments.find((newComment) =>
         this.matchComment(existingComment, newComment)
       )
     );
     console.log({ resolvedComments });
 
     for (let comment of resolvedComments) {
-      const method = `DELETE /repos/${owner}/${repo}/pulls/comments/${comment.id}`;
-      await octokit.request(method);
+      if (comment.id) {
+        const method = `DELETE /repos/${owner}/${repo}/pulls/comments/${comment.id}`;
+        console.log(method);
+        await octokit.request(method);
+      }
     }
   }
 
