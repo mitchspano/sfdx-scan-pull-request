@@ -6,11 +6,10 @@ const COMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
 | --- | --- | --- | --- | --- |`;
 
 class Comments {
-  constructor({ gitHubRestApiClient, comments, inputs }) {
+  constructor({ gitHubRestApiClient }) {
     this.gitHubRestApiClient = gitHubRestApiClient;
-    this.comments = comments;
-    this.inputs = inputs;
     this.hasHaltingError = false;
+    this.comments = [];
   }
 
   /**
@@ -22,20 +21,19 @@ class Comments {
     const { octokit, owner, prNumber, repo } = this.gitHubRestApiClient();
     const existingComments = await this.getExistingComments();
 
-    for (let file in this.filePathToComments) {
-      for (let comment of this.filePathToComments[file]) {
-        // TODO: Add in resolving comments when the issue has been resolved?
-        const existingComment = existingComments.find((existingComment) =>
-          this.matchComment(comment, existingComment)
-        );
-        if (!existingComment) {
-          const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
-          await octokit.request(method, comment);
-        } else {
-          console.log(`Skipping existing comment ${existingComment.url}`);
-        }
+    for (let comment of this.comments) {
+      // TODO: Add in resolving comments when the issue has been resolved?
+      const existingComment = existingComments.find((existingComment) =>
+        this.matchComment(comment, existingComment)
+      );
+      if (!existingComment) {
+        const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
+        await octokit.request(method, comment);
+      } else {
+        console.log(`Skipping existing comment ${existingComment.url}`);
       }
     }
+
     if (this.hasHaltingError === true) {
       core.setFailed("A serious error has been identified");
     }
@@ -77,7 +75,7 @@ class Comments {
     if (endLine === startLine) {
       endLine++;
     }
-    return {
+    this.comments.push({
       commit_id: this.pullRequest?.head?.sha,
       path: filePath,
       start_line: startLine,
@@ -88,7 +86,7 @@ class Comments {
 | ${engine} | ${violation.category} | ${violation.ruleName} | ${violation.severity} | ${type} |
 
 [${violation.message}](${violation.url})`,
-    };
+    });
   }
 }
 

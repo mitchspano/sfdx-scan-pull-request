@@ -53,7 +53,7 @@ function initialSetup() {
     pmdConfig: core.getInput("pmdconfig"),
     tsConfig: core.getInput("tsconfig"),
     commitSha: core.getInput("commit_sha"),
-    useComments: core.getInput("use-comments") === 'true',
+    useComments: core.getInput("use-comments") === "true",
   };
 
   let category = inputs.category ? `--category="${inputs.category}"` : "";
@@ -73,9 +73,7 @@ function initialSetup() {
     comments: filePathToComments,
     inputs,
   };
-  publisher = inputs.useComments
-    ? new Comments(params)
-    : new CheckRuns(params);
+  publisher = inputs.useComments ? new Comments(params) : new CheckRuns(params);
 }
 
 function getGithubRestApiClient() {

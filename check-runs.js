@@ -1,11 +1,11 @@
 const { ERROR, RIGHT, WARNING } = require("./common");
 
 class CheckRuns {
-  constructor({ gitHubRestApiClient, comments, inputs }) {
+  constructor({ gitHubRestApiClient, inputs }) {
     this.gitHubRestApiClient = gitHubRestApiClient;
-    this.comments = comments;
     this.inputs = inputs;
     this.hasHaltingError = false;
+    this.violations = [];
   }
 
   async write() {
@@ -13,14 +13,22 @@ class CheckRuns {
     const { octokit, owner, repo } = this.gitHubRestApiClient;
 
     const method = `POST /repos/${owner}/${repo}/check-runs`;
-    const annotations = Object.values(this.comments).flat();
+    const annotations = Object.values(this.violations).flat();
+
+    let conclusion;
+    if (this.hasHaltingError) {
+      conclusion = "failure";
+    } else {
+      conclusion = this.violations.length === 0 ? "success" : "neutral";
+    }
 
     if (annotations) {
       const request = {
         name: "sfdx-scanner",
         head_sha: this.inputs.commitSha,
         status: "completed",
-        conclusion: "neutral",
+        // action_required, cancelled, failure, neutral, success, skipped, stale, timed_out
+        conclusion: conclusion,
         output: {
           title: "Results from sfdx-scanner",
           summary: `${annotations.length} violations found`,
@@ -51,7 +59,7 @@ class CheckRuns {
     if (endLine === startLine) {
       endLine++;
     }
-    return {
+    this.violations.push({
       path: filePath,
       start_side: RIGHT,
       annotation_level: "notice",
@@ -59,7 +67,7 @@ class CheckRuns {
       end_line: endLine,
       message: `${violation.category} ${violation.message}\n${violation.url}`,
       title: `${violation.ruleName} (sev: ${violation.severity})`,
-    };
+    });
   }
 }
 
