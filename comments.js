@@ -10,6 +10,7 @@ class Comments {
     this.gitHubRestApiClient = gitHubRestApiClient;
     this.hasHaltingError = false;
     this.comments = [];
+    this.pullRequest = pullRequest;
   }
 
   /**
