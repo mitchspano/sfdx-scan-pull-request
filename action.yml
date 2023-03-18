@@ -17,7 +17,7 @@ inputs:
     description: "JSON string which contains the rules which will be strictly enforced regardless of their priority. Enforced rules are identified by their engine, category, and rule name."
   tsconfig:
     description: "Location of tsconfig.json file."
-  commit_sha:
+  commit-sha:
     description: "Commit sha"
   report-mode:
     description: "Use comments or check-runs for reporting errors"

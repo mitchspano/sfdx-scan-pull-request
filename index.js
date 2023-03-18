@@ -52,7 +52,7 @@ function initialSetup() {
     eslintConfig: core.getInput("eslintconfig"),
     pmdConfig: core.getInput("pmdconfig"),
     tsConfig: core.getInput("tsconfig"),
-    commitSha: core.getInput("commit_sha"),
+    commitSha: core.getInput("commit-sha"),
     reportMode: core.getInput("report-mode") ?? "check-runs",
     deleteResolvedComments: core.getInput("delete-resolved-comments") === "true",
   };
@@ -66,6 +66,12 @@ function initialSetup() {
   scannerCliArgs = `${category} ${engine} ${eslintEnv} ${eslintConfig} ${pmdConfig} ${tsConfig}`;
 
   pullRequest = github.context?.payload?.pull_request;
+  console.log(JSON.stringify(github?.context));
+
+  if (!inputs.commitSha && inputs.reportMode === 'check-runs') {
+    console.warn(`'commit-sha' parameter is required when using 'check-runs' reporting`);
+    inputs.reportMode = 'comments';
+  }
 
   const params = {
     gitHubRestApiClient: getGithubRestApiClient(),
