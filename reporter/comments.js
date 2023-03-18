@@ -23,10 +23,8 @@ class Comments {
     console.log("Writing comments using GitHub REST API...");
     const { octokit, owner, prNumber, repo } = this.gitHubRestApiClient;
     const existingComments = await this.getExistingComments();
-    console.log(JSON.stringify({ existingComments }));
 
     for (let comment of this.comments) {
-      console.log({ comment });
       const existingComment = existingComments.find((existingComment) => this.matchComment(comment, existingComment));
       if (!existingComment) {
         const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;

@@ -14,7 +14,7 @@ class CheckRuns {
 
     const method = `POST /repos/${owner}/${repo}/check-runs`;
 
-    let conclusion;
+    let conclusion; // action_required, cancelled, failure, neutral, success, skipped, stale, timed_out
     if (this.hasHaltingError) {
       conclusion = "failure";
     } else {
@@ -26,7 +26,6 @@ class CheckRuns {
         name: "sfdx-scanner",
         head_sha: this.inputs.commitSha,
         status: "completed",
-        // action_required, cancelled, failure, neutral, success, skipped, stale, timed_out
         conclusion: conclusion,
         output: {
           title: "Results from sfdx-scanner",
