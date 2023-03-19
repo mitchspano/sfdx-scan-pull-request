@@ -298,7 +298,8 @@ async function writeComments(
     }
   }
   if (hasHaltingError) {
-    throw new Error("A serious error has been identified");
+    setFailed(`A serious error has been identified`);
+    process.exit();
   }
 }
 
@@ -390,7 +391,4 @@ async function main() {
   }
 }
 
-main().catch((error: Error) => {
-  setFailed(`Error occurred while running action: ${error.message}`);
-  process.exit();
-});
+main();
