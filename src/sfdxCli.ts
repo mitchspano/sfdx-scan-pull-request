@@ -61,9 +61,7 @@ const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
   return result;
 };
 
-export async function scanFiles(
-  scannerFlags: ScannerFlags
-): Promise<ScannerFinding[]> {
+export async function scanFiles(scannerFlags: ScannerFlags) {
   const scannerCliArgs = (
     Object.keys(scannerFlags) as Array<keyof ScannerFlags>
   )
@@ -72,5 +70,8 @@ export async function scanFiles(
     )
     .reduce((acc, [one, two]) => (one && two ? [...acc, one, two] : acc), []);
 
-  return cli<ScannerFinding[]>("scanner:run", [...scannerCliArgs, "--json"]);
+  return cli<ScannerFinding[] | string>("scanner:run", [
+    ...scannerCliArgs,
+    "--json",
+  ]);
 }

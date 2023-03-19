@@ -13,9 +13,7 @@
 
 import { getInput, setFailed } from "@actions/core";
 import { Octokit } from "@octokit/action";
-import copy from "recursive-copy";
 import { context } from "@actions/github";
-import { join } from "path";
 
 import { getDiffInPullRequest, GithubPullRequest } from "./git-actions";
 
@@ -43,13 +41,13 @@ type GithubComment = {
   url?: string;
 };
 
+type GithubExistingComment = GithubComment & {
+  user: {
+    type: "Bot" | "User";
+  };
+};
+
 type GithubCommentSide = "RIGHT";
-
-const COMMMENT_HEADER = `| Engine | Category | Rule | Severity | Type |
-| --- | --- | --- | --- | --- |`;
-const TEMP_DIR_NAME = "temporary";
-
-let hasHaltingError = false;
 
 /**
  * @description Collects and verifies the inputs from the action context and metadata
@@ -62,13 +60,14 @@ function initialSetup() {
     env: getInput("eslint-env"),
     eslintconfig: getInput("eslintconfig"),
     pmdconfig: getInput("pmdconfig"),
-    target: TEMP_DIR_NAME,
+    target: context?.payload?.pull_request ? "" : getInput("target"),
     tsConfig: getInput("tsconfig"),
-  };
+  } as ScannerFlags;
 
-  // TODO: validate inputs
+  // TODO: validate inputs. Technically the scanner's "max" violation level is 3,
+  // where: 1 (high), 2 (moderate), and 3 (low)
   const inputs = {
-    severityThreshold: parseInt(getInput("severity-threshold")) || 5,
+    severityThreshold: parseInt(getInput("severity-threshold")) || 4,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
   };
   return {
@@ -78,52 +77,25 @@ function initialSetup() {
   };
 }
 
-function getGithubRestApiClient(
-  pullRequest: typeof context.payload.pull_request
-) {
-  const octokit = new Octokit();
-  const owner = pullRequest?.base?.repo?.owner?.login;
-  const repo = pullRequest?.base?.repo?.name;
-  const prNumber = pullRequest?.number;
-  return { octokit, owner, prNumber, repo };
-}
-
 /**
- * @description Validate that the action is called from within the scope of a pull request
+ * @description Validate that the action is called correctly
  */
-function validatePullRequestContext(pullRequest: GithubPullRequest) {
-  console.log("Validating that this action was invoked from a pull request...");
-  if (!pullRequest) {
+function validateContext(pullRequest: GithubPullRequest, target: string) {
+  console.log(
+    "Validating that this action was invoked from an acceptable context..."
+  );
+  if (!pullRequest && !target) {
     throw new Error(
-      "This action is only applicable when invoked in the context of a pull request."
+      "This action is only applicable when invoked by a pull request, or with the target property supplied."
     );
   }
 }
 
-/**
- * @description Moves all folders and files which were present in the
- * git difference to a temporary folder.
- */
-async function recursivelyMoveFilesToTempFolder(
-  filePathToChangedLines: Map<string, Set<number>>
-) {
-  console.log("Recursively moving all files to the temp folder...");
-  const filesWithChanges = Object.keys(filePathToChangedLines);
-  for (let file of filesWithChanges) {
-    await copy(file, join(TEMP_DIR_NAME, file), {
-      overwrite: true,
-    });
-  }
-  return filePathToChangedLines;
-}
-
-async function getExistingComments(pullRequest: GithubPullRequest) {
+async function getExistingComments() {
   console.log("Getting existing comments using GitHub REST API...");
-  const { octokit, owner, prNumber, repo } =
-    getGithubRestApiClient(pullRequest);
-
-  const method = `GET /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
-  return (await octokit.paginate(method)) as GithubComment[];
+  return (await performGithubRequest<GithubExistingComment[]>("GET")).filter(
+    (existingComment) => existingComment.user.type === "Bot"
+  );
 }
 
 /**
@@ -138,13 +110,7 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
   );
 
   const findings = await scanFiles(scannerFlags);
-  for (let finding of findings) {
-    finding.fileName = finding.fileName.replace(
-      join(process.cwd(), TEMP_DIR_NAME),
-      process.cwd()
-    );
-  }
-  return findings;
+  return typeof findings === "string" ? [] : findings;
 }
 
 /**
@@ -157,36 +123,39 @@ function filterFindingsToDiffScope(
   findings: ScannerFinding[],
   filePathToChangedLines: Map<string, Set<number>>,
   inputs: PluginInputs,
-  pullRequest: GithubPullRequest
+  scannerFlags: ScannerFlags
 ) {
   console.log(
     "Filtering the findings to just the lines which are part of the pull request..."
   );
   const filePathToComments = new Map<string, GithubComment[]>();
+  let hasHaltingError = false;
+
   for (let finding of findings) {
     const filePath = finding.fileName.replace(process.cwd() + "/", "");
     const relevantLines =
       filePathToChangedLines.get(filePath) || new Set<number>();
     for (let violation of finding.violations) {
-      if (isInChangedLines(violation, relevantLines)) {
-        if (!filePathToComments.has(filePath)) {
-          filePathToComments.set(filePath, []);
-        }
-        filePathToComments
-          .get(filePath)
-          ?.push(
-            translateViolationToComment(
-              filePath,
-              violation,
-              finding.engine,
-              inputs,
-              pullRequest
-            )
-          );
+      if (!isInChangedLines(violation, relevantLines) && !scannerFlags.target) {
+        continue;
       }
+      if (!filePathToComments.has(filePath)) {
+        filePathToComments.set(filePath, []);
+      }
+
+      const { comment, violationType } = translateViolationToComment(
+        filePath,
+        violation,
+        finding.engine,
+        inputs
+      );
+      if (violationType === "Error") {
+        hasHaltingError = true;
+      }
+      filePathToComments.get(filePath)?.push(comment);
     }
   }
-  return filePathToComments;
+  return { filePathToComments, hasHaltingError };
 }
 
 /**
@@ -221,29 +190,44 @@ function translateViolationToComment(
   filePath: string,
   violation: ScannerViolation,
   engine: string,
-  inputs: PluginInputs,
-  pullRequest: GithubPullRequest
-): GithubComment {
-  const type = getScannerViolationType(inputs, violation, engine);
-  if (type === "Error") {
-    hasHaltingError = true;
-  }
+  inputs: PluginInputs
+): { comment: GithubComment; violationType: ScannerViolationType } {
+  const startLine = parseInt(violation.line);
   let endLine = violation.endLine
     ? parseInt(violation.endLine)
     : parseInt(violation.line);
-  const startLine = parseInt(violation.line);
   if (endLine === startLine) {
     endLine++;
   }
+
+  const violationType = getScannerViolationType(inputs, violation, engine);
+  const commit_id = context.payload.pull_request
+    ? context.payload.pull_request.head.sha
+    : context.sha;
+
+  const commentHeader = `| Engine | Category | Rule | Severity | Type | Message | File |
+  | --- | --- | --- | --- | --- | --- | --- |`;
   return {
-    commit_id: pullRequest?.head?.sha,
-    path: filePath,
-    start_line: startLine,
-    start_side: "RIGHT",
-    side: "RIGHT",
-    line: endLine,
-    body: `${COMMMENT_HEADER} | ${engine} | ${violation.category} | ${violation.ruleName} | ${violation.severity} | ${type} | [${violation.message}](${violation.url})`,
+    comment: {
+      commit_id,
+      path: filePath,
+      start_line: startLine,
+      start_side: "RIGHT",
+      side: "RIGHT",
+      line: endLine,
+      body: `${commentHeader}
+| ${engine} | ${violation.category} | ${violation.ruleName} | ${
+        violation.severity
+      } | ${violationType} | [${violation.message.trim()}](${
+        violation.url
+      }) | [${filePath}](${getGithubFilePath(commit_id, filePath)}) |`,
+    },
+    violationType,
   };
+}
+
+function getGithubFilePath(commitId: string, filePath: string) {
+  return ["..", "tree", commitId, filePath].join("/");
 }
 
 /**
@@ -286,37 +270,92 @@ function getScannerViolationType(
 async function writeComments(
   existingComments: GithubComment[],
   filePathToComments: Map<string, GithubComment[]>,
-  pullRequest: GithubPullRequest,
   hasHaltingError: boolean
 ) {
   console.log("Writing comments using GitHub REST API...");
-  const { octokit, owner, prNumber, repo } =
-    getGithubRestApiClient(pullRequest);
-  for (let file in filePathToComments) {
-    for (let comment of filePathToComments.get(file) || []) {
-      // TODO: Add in resolving comments when the issue has been resolved?
+
+  for (let [_, comments] of filePathToComments) {
+    if (!comments) {
+      continue;
+    }
+    for (let comment of comments) {
       const existingComment = existingComments.find((existingComment) =>
         matchComment(comment, existingComment)
       );
       if (!existingComment) {
-        const method = `POST /repos/${owner}/${repo}/pulls/${prNumber}/comments`;
-        await octokit.request(method, comment);
+        console.log("No matching comment found, uploading new comment");
+        try {
+          await performGithubRequest("POST", comment);
+        } catch (err: unknown) {
+          console.error("Error while uploading comments!", err);
+          throw err as Error;
+        }
       } else {
+        // TODO: It would be nice to resolve comments when there's no longer a scan result for an existing comment but
+        // at present, GitHub has no REST api support for this through Octokit (only GraphQL resolution is currently supported).
         console.log(`Skipping existing comment ${existingComment.url}`);
       }
     }
   }
-  if (hasHaltingError === true) {
+  if (hasHaltingError) {
     throw new Error("A serious error has been identified");
   }
 }
 
 function matchComment(commentA: GithubComment, commentB: GithubComment) {
+  // Removes the "File" property from each body
+  // since that particular column is commit-specific (and thus would always differ)
+  const getSanitizedBody = (body: string) =>
+    body
+      .split("|")
+      .filter((bodySection) => bodySection)
+      .slice(0, -1)
+      .toString();
   return (
     commentA.line === commentB.line &&
-    commentA.body === commentB.body &&
+    getSanitizedBody(commentA.body) === getSanitizedBody(commentB.body) &&
     commentA.path === commentB.path
   );
+}
+
+function performGithubRequest<T>(
+  method: "POST" | "GET",
+  optionalBody?: GithubComment
+) {
+  const octokit = new Octokit();
+  const owner = context.repo.owner;
+  const repo = context.repo.repo;
+  const prNumber = context.payload.pull_request?.number;
+
+  const endpoint = `${method} /repos/${owner}/${repo}/${
+    prNumber ? `pulls/${prNumber}` : `commits/${context.sha}`
+  }/comments`;
+
+  return (
+    method === "POST"
+      ? octokit.request(endpoint, optionalBody)
+      : octokit.paginate(endpoint)
+  ) as Promise<T>;
+}
+
+function updateScannerTarget(
+  filePathToChangedLines: Map<string, Set<number>>,
+  scannerFlags: ScannerFlags
+) {
+  if (!scannerFlags.target) {
+    scannerFlags.target = "";
+    for (let [filePath, changedLines] of filePathToChangedLines) {
+      if (changedLines.size > 0) {
+        scannerFlags.target += filePath + ",";
+      }
+    }
+    if (scannerFlags.target.endsWith(",")) {
+      scannerFlags.target = scannerFlags.target.slice(
+        0,
+        scannerFlags.target.length - 1
+      );
+    }
+  }
 }
 
 /**
@@ -325,33 +364,30 @@ function matchComment(commentA: GithubComment, commentB: GithubComment) {
 async function main() {
   console.log("Beginning sfdx-scan-pull-request run...");
   const { inputs, pullRequest, scannerFlags } = initialSetup();
-  validatePullRequestContext(pullRequest);
+  validateContext(pullRequest, scannerFlags.target);
 
   const [filePathToChangedLines, existingComments] = await Promise.all([
     getDiffInPullRequest(
-      [pullRequest?.head?.ref, pullRequest?.base?.ref],
+      [pullRequest?.base?.ref, pullRequest?.head?.ref],
       pullRequest?.base?.repo?.clone_url
-    ).then(recursivelyMoveFilesToTempFolder),
-    getExistingComments(pullRequest),
+    ),
+    getExistingComments(),
   ]);
 
-  // temporally depends on "recursivelyMoveFilesToTempFolder"
-  // as we only scan updated files
-  const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
-    scannerFlags
-  );
-  const filePathToComments = filterFindingsToDiffScope(
-    diffFindings,
-    filePathToChangedLines,
-    inputs,
-    pullRequest
-  );
-  writeComments(
-    existingComments,
-    filePathToComments,
-    pullRequest,
-    hasHaltingError
-  );
+  updateScannerTarget(filePathToChangedLines, scannerFlags);
+
+  if (scannerFlags.target) {
+    const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
+      scannerFlags
+    );
+    const { filePathToComments, hasHaltingError } = filterFindingsToDiffScope(
+      diffFindings,
+      filePathToChangedLines,
+      inputs,
+      scannerFlags
+    );
+    writeComments(existingComments, filePathToComments, hasHaltingError);
+  }
 }
 
 main().catch((error: Error) => {

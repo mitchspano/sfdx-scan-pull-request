@@ -34,21 +34,23 @@ export async function getDiffInPullRequest(
   diffArgs: string[],
   destination?: string
 ) {
-  const filePathToChangedLines = new Map<string, Set<number>>();
-  console.log("Getting difference within the pull request...");
+  console.log("Getting difference within the pull request ...", diffArgs);
   if (destination) {
     await git.addRemote(DESTINATION_REMOTE_NAME, destination);
     await git.remote(["update"]);
   }
 
-  diffArgs = diffArgs.map(
-    (diffArg, index) =>
-      `${index === 0 ? "origin" : DESTINATION_REMOTE_NAME}/${diffArg}`
-  );
+  diffArgs = diffArgs
+    .filter((arg) => arg)
+    .map(
+      (diffArg, index) =>
+        `${index === 0 ? "origin" : DESTINATION_REMOTE_NAME}/${diffArg}`
+    );
 
   const diffString = await git.diff(diffArgs);
   const files = parse(diffString);
 
+  const filePathToChangedLines = new Map<string, Set<number>>();
   for (let file of files) {
     if (file.to && file.to !== "/dev/null") {
       const changedLines = new Set<number>();

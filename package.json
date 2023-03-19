@@ -1,14 +1,11 @@
 {
   "name": "sfdx-scan-pull-request",
   "dependencies": {
-    "@actions/core": "^1.9.0",
-    "@actions/github": "^5.0.3",
+    "@actions/core": "^1.10.0",
+    "@actions/github": "^5.1.1",
     "@octokit/action": "^4.0.4",
-    "@salesforce/sfdx-scanner": "3.8.0",
     "parse-diff": "^0.9.0",
     "path": "^0.12.7",
-    "recursive-copy": "^2.0.14",
-    "sfdx-cli": "7.188.1",
     "simple-git": "3.15.1"
   },
   "devDependencies": {
@@ -27,9 +24,9 @@
     "@oclif/core": "^1.24.2"
   },
   "scripts": {
-    "build": "npm run test && npm run tsc && npm run ncc",
+    "build": "npm run tsc && npm run ncc",
     "ncc": "ncc build lib/index.js -m",
-    "runLocally": "echo act must be installed for this to work && act pull_request -W __tests__/example-action.yml --input pmdconfig=__tests__/pmd-ruleset.xml --input severity-threshold=3 --eventpath __tests__/example-github-event.json",
+    "runLocally": "echo act must be installed for this to work && act pull_request -W .github/workflows/example-action.yml --input pmdconfig=tests/pmd-ruleset.xml --input severity-threshold=3 --eventpath tests/example-github-event.json",
     "test": "jest --coverage",
     "tsc": "tsc"
   }
