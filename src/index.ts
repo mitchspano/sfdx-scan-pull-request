@@ -93,6 +93,7 @@ function validateContext(pullRequest: GithubPullRequest, target: string) {
 
 async function getExistingComments() {
   console.log("Getting existing comments using GitHub REST API...");
+
   return (await performGithubRequest<GithubExistingComment[]>("GET")).filter(
     (existingComment) => existingComment.user.type === "Bot"
   );
@@ -284,12 +285,7 @@ async function writeComments(
       );
       if (!existingComment) {
         console.log("No matching comment found, uploading new comment");
-        try {
-          await performGithubRequest("POST", comment);
-        } catch (err: unknown) {
-          console.error("Error while uploading comments!", err);
-          throw err as Error;
-        }
+        await performGithubRequest("POST", comment);
       } else {
         // TODO: It would be nice to resolve comments when there's no longer a scan result for an existing comment but
         // at present, GitHub has no REST api support for this through Octokit (only GraphQL resolution is currently supported).
@@ -332,11 +328,20 @@ function performGithubRequest<T>(
     prNumber ? `pulls/${prNumber}` : `commits/${context.sha}`
   }/comments`;
 
-  return (
-    method === "POST"
-      ? octokit.request(endpoint, optionalBody)
-      : octokit.paginate(endpoint)
-  ) as Promise<T>;
+  try {
+    return (
+      method === "POST"
+        ? octokit.request(endpoint, optionalBody)
+        : octokit.paginate(endpoint)
+    ) as Promise<T>;
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.error(`${err.message}\nStacktrace: ${err.stack}`);
+      setFailed(`Error while calling out to GitHub`);
+      process.exit();
+    }
+    return Promise.resolve() as Promise<T>;
+  }
 }
 
 function updateScannerTarget(
