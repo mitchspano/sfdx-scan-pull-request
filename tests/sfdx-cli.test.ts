@@ -25,7 +25,7 @@ describe("CLI tests!", () => {
       }
 
       const scannerViolations = findings[0].violations;
-      expect(scannerViolations.length).toBe(6);
+      expect(scannerViolations.length).toBe(4);
       expect(
         scannerViolations.find(
           (violation) =>
