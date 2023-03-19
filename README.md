@@ -85,14 +85,14 @@ This package includes the following version of the required dependencies:
 
  <!-- @salesforce/sfdx-scanner (sfdx-cli plugin) 2.13.7            -->
 
-#### Making Modifications
+### Making Modifications
 
-To make modifications to this project which change these dependencies, be sure to run the following command before raising a pull request:
+To make modifications to this project, be sure to run the following command before raising a pull request:
 
 ```
 npm run build
 ```
 
-This will use [ncc](https://github.com/vercel/ncc) to bundle the contents of `node_modules` into the `dist` folder.
+This will use [ncc](https://github.com/vercel/ncc) to bundle the contents of the project and  `node_modules` into the `dist` folder.
 
 For more information regarding the inclusion of these static versioned dependencies and the necessity of the `build` command, check out this [documentation](https://docs.github.com/en/actions/creating-actions/creating-a-javascript-action#commit-tag-and-push-your-action-to-github)
