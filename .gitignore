@@ -1,0 +1,8 @@
+node_modules
+lib/git-actions.js
+lib/index.js
+lib/sfdxCli.js
+coverage
+.sfdx
+.sf
+*-diagnosis.json

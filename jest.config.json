@@ -1,0 +1,15 @@
+{
+  "roots": ["<rootDir>/tests", "<rootDir>/src"],
+  "clearMocks": true,
+  "moduleFileExtensions": ["js", "ts"],
+  "moduleNameMapper": {
+    "@oclif/core/lib/errors/logger": "<rootDir>/node_modules/sfdx-cli/node_modules/@oclif/core/lib/errors/logger"
+  },
+  "testMatch": [
+    "**/tests/**/*.(spec|test).[jt]s?(x)",
+    "**/?(*.)+(spec|test).[jt]s?(x)"
+  ],
+  "transform": {
+    "^.+\\.(t|j)sx?$": "@swc/jest"
+  }
+}

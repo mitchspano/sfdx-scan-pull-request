@@ -1,4 +1,0 @@
-{
-  "main":     "node_websocket",
-  "browser":  "browser_websocket"
-}

@@ -1,9 +1,0 @@
-{
-  "description": "log out from authorized orgs\nBy default, this command logs you out from your default scratch org.",
-  "examples": ["$ sfdx auth:logout -u me@my.org", "$ sfdx auth:logout -a", "$ sfdx auth:logout -p"],
-  "all": "include all authenticated orgs",
-  "allLong": "Includes all authenticated orgs: for example, Dev Hubs, sandboxes, DE orgs, and expired, deleted, and unknown-status scratch orgs.",
-  "logoutCommandYesNo": "Are you sure you want to log out from these org(s)?\n%s\n\nImportant: You need a password to reauthorize scratch orgs. By default, scratch orgs have no password. If you still need your scratch orgs, run \"sfdx force:user:password:generate\" before logging out. If you don't need the scratch orgs anymore, run \"sfdx force:org:delete\" instead of logging out.\n\nLog out (y/n)?",
-  "specifiedBothUserAndAllError": "Specify either --targetusername or --all.",
-  "logoutOrgCommandSuccess": "Successfully logged out of orgs: %s"
-}

@@ -1,8 +1,0 @@
-{
-  "queryNotProvided": "Provide a SOQL query statement or file containing a SOQL statement.",
-  "soqlInvalid": "Invalid SOQL query: %s",
-  "soqlMalformed": "The provided SOQL is malformed: %s",
-  "soqlMalformedAction": "Check the SOQL syntax and try again.",
-  "dataExportRecordCount": "Processed %s records from query: %s",
-  "dataExportRecordCountWarning": "Query returned more than 200 records. Please run the command using the plan option instead.\n Record Count: %s \nQuery: %s"
-}

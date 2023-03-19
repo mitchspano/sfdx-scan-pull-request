@@ -1,6 +1,6 @@
 # sfdx-scan-pull-request
 
-Runs sfdx-scanner on a pull request and generates in-line comments with the findings.
+Runs sfdx-scanner on a pull request or individual commit and generates in-line comments with the findings.
 
 ![Example](images/sfdx-scan-pull-request.png)
 
@@ -33,6 +33,10 @@ Throws an error when violations of specific severity (or more severe) are detect
 ## `strictly-enforced-rules`
 
 A JSON string which contains the rules which will be strictly enforced regardless of their priority. Enforced rules are identified by their engine, category, and rule name.
+
+## `target`
+
+Optionally provide this to scan a whole directory instead of just the diff. If the action is run on a push, `target` will be respected; because GitHub does not allow the uploading of comments during a PR run for a file that hasn't been changed on the latest commit for that PR, this option is ignored when running for a pull request (in favor of just scanning the diff, as it would if this option wasn't supplied).
 
 ## `tsconfig`
 
@@ -77,8 +81,7 @@ This package includes the following version of the required dependencies:
 | @actions/github | 5.0.3            |
 | @octokit/action | 4.0.4            |
 | parse-diff      | 0.9.0            |
-| recursive-copy  | 2.0.14           |
-| sfdx-cli        | 7.161.0          |
+| simple-git      | 3.15.1           |
 
  <!-- @salesforce/sfdx-scanner (sfdx-cli plugin) 2.13.7            -->
 
