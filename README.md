@@ -62,7 +62,7 @@ jobs:
           npm install sfdx-cli
           node_modules/sfdx-cli/bin/run plugins:install @salesforce/sfdx-scanner
       - name: Run SFDX Scanner - Report findings as comments
-        uses: mitchspano/sfdx-scan-pull-request@v0.1.7
+        uses: mitchspano/sfdx-scan-pull-request@v0.1.8
         with:
           pmdconfig: ruleset.xml
           severity-threshold: 4
@@ -85,4 +85,14 @@ This package includes the following version of the required dependencies:
 
  <!-- @salesforce/sfdx-scanner (sfdx-cli plugin) 2.13.7            -->
 
-For more information regarding the inclusion of these static versioned dependencies, see [here](https://docs.github.com/en/actions/creating-actions/creating-a-javascript-action#commit-tag-and-push-your-action-to-github)
+#### Making Modifications
+
+To make modifications to this project which change these dependencies, be sure to run the following command before raising a pull request:
+
+```
+npm run build
+```
+
+This will use [ncc](https://github.com/vercel/ncc) to bundle the contents of `node_modules` into the `dist` folder.
+
+For more information regarding the inclusion of these static versioned dependencies and the necessity of the `build` command, check out this [documentation](https://docs.github.com/en/actions/creating-actions/creating-a-javascript-action#commit-tag-and-push-your-action-to-github)
