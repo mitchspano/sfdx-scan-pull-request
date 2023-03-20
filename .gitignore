@@ -1,7 +1,5 @@
 node_modules
-lib/git-actions.js
-lib/index.js
-lib/sfdxCli.js
+lib/*
 coverage
 .sfdx
 .sf
