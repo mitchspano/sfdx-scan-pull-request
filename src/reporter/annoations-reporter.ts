@@ -6,10 +6,10 @@ import {
 } from "../common";
 import { Octokit } from "@octokit/action";
 import { context } from "@actions/github";
-import { Reporter } from "./reporter.types";
+import { BaseReporter } from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
 
-export class AnnotationsReporter extends Reporter {
+export class AnnotationsReporter extends BaseReporter {
   private performGithubRequest<T>(body: GithubCheckRun) {
     const octokit = new Octokit();
     const owner = context.repo.owner;

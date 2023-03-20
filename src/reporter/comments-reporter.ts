@@ -8,12 +8,12 @@ import {
 import core, { setFailed } from "@actions/core";
 import { Octokit } from "@octokit/action";
 import { context } from "@actions/github";
-import { Reporter } from "./reporter.types";
+import { BaseReporter } from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
 
 const COMMENT_PREFIX = "sfdx-scanner:";
 
-export class CommentsReporter extends Reporter {
+export class CommentsReporter extends BaseReporter {
   private performGithubRequest<T>(
     method: "POST" | "GET",
     optionalBody?: GithubComment
@@ -181,7 +181,9 @@ export class CommentsReporter extends Reporter {
       side: "RIGHT",
       line: endLine,
       body: `${commentHeader}
-| ${COMMENT_PREFIX}${engine} | ${violation.category} | ${violation.ruleName} | ${
+| ${COMMENT_PREFIX}${engine} | ${violation.category} | ${
+        violation.ruleName
+      } | ${
         violation.severity
       } | ${violationType} | [${violation.message.trim()}](${
         violation.url
