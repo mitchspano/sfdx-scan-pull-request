@@ -16,10 +16,10 @@ export interface Reporter {
   ): { violationType: string };
 }
 
-export abstract class BaseReporter implements Reporter {
+export abstract class BaseReporter<T> implements Reporter {
   protected hasHaltingError;
   protected inputs: PluginInputs;
-  protected issues: any[];
+  protected issues: T[];
   protected context: Context;
   constructor({ context, inputs }: ReporterProps) {
     this.hasHaltingError = false;

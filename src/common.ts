@@ -42,8 +42,8 @@ export type GithubAnnotation = {
   path: string;
   start_side: string;
   annotation_level: "notice"; // add,
-  start_line: string;
-  end_line: string;
+  start_line: number;
+  end_line: number;
   message: string;
   title: string;
 };

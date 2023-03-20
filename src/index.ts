@@ -151,7 +151,7 @@ function isInChangedLines(
     i <= parseInt(violation.endLine);
     i++
   ) {
-    if (!relevantLines || relevantLines.has(i) == false) {
+    if (!relevantLines || !relevantLines.has(i)) {
       return false;
     }
   }

@@ -13,7 +13,7 @@ import { ScannerViolation } from "../sfdxCli";
 
 const COMMENT_PREFIX = "sfdx-scanner:";
 
-export class CommentsReporter extends BaseReporter {
+export class CommentsReporter extends BaseReporter<GithubComment> {
   private performGithubRequest<T>(
     method: "POST" | "GET",
     optionalBody?: GithubComment

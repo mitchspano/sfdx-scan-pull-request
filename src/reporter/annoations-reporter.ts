@@ -1,6 +1,7 @@
 import {
   ERROR,
   getScannerViolationType,
+  GithubAnnotation,
   GithubCheckRun,
   RIGHT,
 } from "../common";
@@ -9,7 +10,7 @@ import { context } from "@actions/github";
 import { BaseReporter } from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
 
-export class AnnotationsReporter extends BaseReporter {
+export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
   private performGithubRequest<T>(body: GithubCheckRun) {
     const octokit = new Octokit();
     const owner = context.repo.owner;
