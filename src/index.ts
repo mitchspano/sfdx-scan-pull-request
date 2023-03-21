@@ -38,7 +38,7 @@ function initialSetup() {
     env: getInput("eslint-env"),
     eslintconfig: getInput("eslintconfig"),
     pmdconfig: getInput("pmdconfig"),
-    target: context?.payload?.pull_request ? "" : getInput("target"),
+    target: getInput("target"),
     tsConfig: getInput("tsconfig"),
   } as ScannerFlags;
 
@@ -122,7 +122,7 @@ function filterFindingsToDiffScope(
       const isNotTarget = !scannerFlags.target
       console.log({isNotChangedLines, isNotTarget, target: scannerFlags.target})
       if (isNotChangedLines && isNotTarget) {
-        console.log('skip line', {filePath, enndLine: violation.endLine});
+        console.log('skip line', {filePath, endLine: violation.endLine});
         continue;
       }
 
