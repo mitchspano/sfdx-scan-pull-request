@@ -49,6 +49,7 @@ function initialSetup() {
     severityThreshold: parseInt(getInput("severity-threshold")) || 4,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
     deleteResolvedComments: getInput("delete-resolved-comments") === "true",
+    target: getInput("target"),
   };
 
   const params = {
@@ -105,7 +106,7 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
 function filterFindingsToDiffScope(
   findings: ScannerFinding[],
   filePathToChangedLines: Map<string, Set<number>>,
-  scannerFlags: ScannerFlags,
+  inputs: PluginInputs,
   reporter: Reporter
 ) {
   console.log(
@@ -119,10 +120,10 @@ function filterFindingsToDiffScope(
       filePathToChangedLines.get(filePath) || new Set<number>();
     for (let violation of finding.violations) {
       const isNotChangedLines = !isInChangedLines(violation, relevantLines);
-      const isNotTarget = !scannerFlags.target
-      console.log({isNotChangedLines, isNotTarget, target: scannerFlags.target})
-      if (isNotChangedLines && isNotTarget) {
-        console.log('skip line', {filePath, endLine: violation.endLine});
+      const isEmptyTarget = !inputs.target;
+      console.log({ isNotChangedLines, isEmptyTarget, target: inputs.target });
+      if (isNotChangedLines && isEmptyTarget) {
+        console.log("skip line", { filePath, endLine: violation.endLine });
         continue;
       }
 
@@ -194,7 +195,7 @@ function updateScannerTarget(
  */
 async function main() {
   console.log("Beginning sfdx-scan-pull-request run...");
-  const { pullRequest, scannerFlags, reporter } = initialSetup();
+  const { pullRequest, scannerFlags, reporter, inputs } = initialSetup();
   validateContext(pullRequest, scannerFlags.target);
 
   const filePathToChangedLines = await getDiffInPullRequest(
@@ -211,7 +212,7 @@ async function main() {
     const { hasHaltingError } = filterFindingsToDiffScope(
       diffFindings,
       filePathToChangedLines,
-      scannerFlags,
+      inputs,
       reporter
     );
     await reporter.write();

@@ -5,6 +5,7 @@ export type PluginInputs = {
   strictlyEnforcedRules: string;
   deleteResolvedComments: boolean;
   reportMode: string | "comments" | "check-runs";
+  target: string;
 };
 
 export type GithubComment = {
