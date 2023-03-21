@@ -38,7 +38,7 @@ function initialSetup() {
     env: getInput("eslint-env"),
     eslintconfig: getInput("eslintconfig"),
     pmdconfig: getInput("pmdconfig"),
-    target: getInput("target"),
+    target: context?.payload?.pull_request ? "" : getInput("target"),
     tsConfig: getInput("tsconfig"),
   } as ScannerFlags;
 
@@ -121,9 +121,7 @@ function filterFindingsToDiffScope(
     for (let violation of finding.violations) {
       const isNotChangedLines = !isInChangedLines(violation, relevantLines);
       const isEmptyTarget = !inputs.target;
-      console.log({ isNotChangedLines, isEmptyTarget, target: inputs.target });
       if (isNotChangedLines && isEmptyTarget) {
-        console.log("skip line", { filePath, endLine: violation.endLine });
         continue;
       }
 
@@ -148,12 +146,7 @@ function isInChangedLines(
   violation: ScannerViolation,
   relevantLines: Set<number>
 ) {
-  console.log({ violation, relevantLines });
   if (!violation.endLine) {
-    console.log(
-      "relevantLines && relevantLines.has(parseInt(violation.line))",
-      relevantLines && relevantLines.has(parseInt(violation.line))
-    );
     return relevantLines && relevantLines.has(parseInt(violation.line));
   }
   for (
@@ -162,11 +155,9 @@ function isInChangedLines(
     i++
   ) {
     if (!relevantLines || !relevantLines.has(i)) {
-      console.log("!relevantLines || !relevantLines.has(i)", false);
       return false;
     }
   }
-  console.log("return true");
   return true;
 }
 

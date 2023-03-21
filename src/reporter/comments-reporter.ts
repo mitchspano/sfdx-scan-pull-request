@@ -11,7 +11,7 @@ import { context } from "@actions/github";
 import { BaseReporter } from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
 
-const COMMENT_PREFIX = "sfdx-scanner:";
+const HIDDEN_COMMENT_PREFIX = "<!--sfdx-scanner-->";
 
 export class CommentsReporter extends BaseReporter<GithubComment> {
   private performGithubRequest<T>(
@@ -133,7 +133,8 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
       await this.performGithubRequest<GithubExistingComment[]>("GET")
     ).filter(
       (comment) =>
-        comment.body.includes(COMMENT_PREFIX) && comment.user.type === "Bot"
+        comment.body.includes(HIDDEN_COMMENT_PREFIX) &&
+        comment.user.type === "Bot"
     );
   }
 
@@ -171,7 +172,8 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
       ? this.context.payload.pull_request.head.sha
       : this.context.sha;
 
-    const commentHeader = `| Engine | Category | Rule | Severity | Type | Message | File |
+    const commentHeader = `${HIDDEN_COMMENT_PREFIX}
+  | Engine | Category | Rule | Severity | Type | Message | File |
   | --- | --- | --- | --- | --- | --- | --- |`;
     this.issues.push({
       commit_id,
@@ -181,9 +183,7 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
       side: "RIGHT",
       line: endLine,
       body: `${commentHeader}
-| ${COMMENT_PREFIX}${engine} | ${violation.category} | ${
-        violation.ruleName
-      } | ${
+| ${engine} | ${violation.category} | ${violation.ruleName} | ${
         violation.severity
       } | ${violationType} | [${violation.message.trim()}](${
         violation.url

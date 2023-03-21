@@ -31,7 +31,7 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
       conclusion = this.issues.length === 0 ? "success" : "neutral";
     }
 
-    const commit_id = this.context.payload.pull_request
+    const commit_id = this.context.payload?.pull_request
       ? this.context.payload.pull_request.head.sha
       : this.context.sha;
 
