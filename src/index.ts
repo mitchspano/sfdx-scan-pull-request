@@ -143,7 +143,12 @@ function isInChangedLines(
   violation: ScannerViolation,
   relevantLines: Set<number>
 ) {
+  console.log({ violation, relevantLines });
   if (!violation.endLine) {
+    console.log(
+      "relevantLines && relevantLines.has(parseInt(violation.line))",
+      relevantLines && relevantLines.has(parseInt(violation.line))
+    );
     return relevantLines && relevantLines.has(parseInt(violation.line));
   }
   for (
@@ -152,9 +157,11 @@ function isInChangedLines(
     i++
   ) {
     if (!relevantLines || !relevantLines.has(i)) {
+      console.log("!relevantLines || !relevantLines.has(i)", false);
       return false;
     }
   }
+  console.log("return true");
   return true;
 }
 
