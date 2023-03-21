@@ -44,7 +44,9 @@ Location of tsconfig.json file
 
 ## `report-mode`
 
-Details which way to report issues back to GitHub, can be either `check-runns` or `comments`
+Details which way to report issues back to GitHub, can be either:
+- `check-runs` - Shows findings as annotations on the PR
+- `comments` - Shows findings as comments
 
 ## `delete-resolved-comments`
 
