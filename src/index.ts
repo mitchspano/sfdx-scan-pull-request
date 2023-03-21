@@ -118,7 +118,10 @@ function filterFindingsToDiffScope(
     const relevantLines =
       filePathToChangedLines.get(filePath) || new Set<number>();
     for (let violation of finding.violations) {
-      if (!isInChangedLines(violation, relevantLines) && !scannerFlags.target) {
+      const isNotChangedLines = !isInChangedLines(violation, relevantLines);
+      const isNotTarget = !scannerFlags.target
+      console.log({isNotChangedLines, isNotTarget, target: scannerFlags.target})
+      if (isNotChangedLines && isNotTarget) {
         console.log('skip line', {filePath, enndLine: violation.endLine});
         continue;
       }
