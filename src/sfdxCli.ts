@@ -62,6 +62,7 @@ const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
 };
 
 export async function scanFiles(scannerFlags: ScannerFlags) {
+  scannerFlags.target = `"` + scannerFlags.target + `"`;
   const scannerCliArgs = (
     Object.keys(scannerFlags) as Array<keyof ScannerFlags>
   )

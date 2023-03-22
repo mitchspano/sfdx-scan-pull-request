@@ -168,14 +168,14 @@ function isInChangedLines(
   relevantLines: Set<number>
 ) {
   if (!violation.endLine) {
-    return relevantLines && relevantLines.has(parseInt(violation.line));
+    return relevantLines.has(parseInt(violation.line));
   }
   for (
     let i = parseInt(violation.line);
     i <= parseInt(violation.endLine);
     i++
   ) {
-    if (!relevantLines || relevantLines.has(i) == false) {
+    if (relevantLines.has(i) == false) {
       return false;
     }
   }
