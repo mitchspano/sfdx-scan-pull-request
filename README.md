@@ -57,10 +57,12 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
       - name: Install SFDX CLI and Scanner
         run: |
-          npm install sfdx-cli
-          node_modules/sfdx-cli/bin/run plugins:install @salesforce/sfdx-scanner
+          npm install sfdx-cli -g
+          sfdx plugins:install @salesforce/sfdx-scanner
+
       - name: Run SFDX Scanner - Report findings as comments
         uses: mitchspano/sfdx-scan-pull-request@v0.1.8
         with:
@@ -70,6 +72,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+Note the global installation of the SFDX cli - alternatively, you can use:
+
+```
+- name: Install SFDX CLI and Scanner
+  run: |
+    npm install sfdx-cli
+    npx sfdx plugins:install @salesforce/sfdx-scanne
+```
+
+for that step.
 
 ### Included Dependencies
 
@@ -81,7 +94,7 @@ This package includes the following version of the required dependencies:
 | @actions/github | 5.0.3            |
 | @octokit/action | 4.0.4            |
 | parse-diff      | 0.9.0            |
-| simple-git      | 3.15.1           |
+| simple-git      | 3.17.0           |
 
  <!-- @salesforce/sfdx-scanner (sfdx-cli plugin) 2.13.7            -->
 
@@ -93,6 +106,6 @@ To make modifications to this project, be sure to run the following command befo
 npm run build
 ```
 
-This will use [ncc](https://github.com/vercel/ncc) to bundle the contents of the project and  `node_modules` into the `dist` folder.
+This will use [ncc](https://github.com/vercel/ncc) to bundle the contents of the project and `node_modules` into the `dist` folder.
 
 For more information regarding the inclusion of these static versioned dependencies and the necessity of the `build` command, check out this [documentation](https://docs.github.com/en/actions/creating-actions/creating-a-javascript-action#commit-tag-and-push-your-action-to-github)
