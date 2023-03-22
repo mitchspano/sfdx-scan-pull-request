@@ -1,14 +1,13 @@
-import {
-  getGithubFilePath,
-  getScannerViolationType,
-  GithubComment,
-  GithubExistingComment,
-} from "../common";
+import { getGithubFilePath, getScannerViolationType } from "../common";
 
-import core, { setFailed } from "@actions/core";
+import core from "@actions/core";
 import { Octokit } from "@octokit/action";
 import { context } from "@actions/github";
-import { BaseReporter } from "./reporter.types";
+import {
+  BaseReporter,
+  GithubComment,
+  GithubExistingComment,
+} from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
 
 const HIDDEN_COMMENT_PREFIX = "<!--sfdx-scanner-->";
@@ -67,42 +66,6 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
 
     if (this.inputs.deleteResolvedComments) {
       await this.deleteResolvedComments(this.issues, existingComments);
-    }
-  }
-
-  async writeComments(
-    existingComments: GithubComment[],
-    filePathToComments: Map<string, GithubComment[]>,
-    hasHaltingError: boolean
-  ) {
-    console.log("Writing comments using GitHub REST API...");
-
-    for (let [_, comments] of filePathToComments) {
-      if (!comments) {
-        continue;
-      }
-      for (let comment of comments) {
-        const existingComment = existingComments.find((existingComment) =>
-          this.matchComment(comment, existingComment)
-        );
-        if (!existingComment) {
-          console.log("No matching comment found, uploading new comment");
-          try {
-            await this.performGithubRequest("POST", comment);
-          } catch (err: unknown) {
-            console.error("Error while uploading comments!", err);
-            throw err as Error;
-          }
-        } else {
-          // TODO: It would be nice to resolve comments when there's no longer a scan result for an existing comment but
-          // at present, GitHub has no REST api support for this through Octokit (only GraphQL resolution is currently supported).
-          console.log(`Skipping existing comment ${existingComment.url}`);
-        }
-      }
-    }
-    if (hasHaltingError) {
-      setFailed(`A serious error has been identified`);
-      process.exit();
     }
   }
 

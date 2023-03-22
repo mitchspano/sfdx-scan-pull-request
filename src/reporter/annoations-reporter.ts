@@ -1,14 +1,15 @@
-import {
-  ERROR,
-  getScannerViolationType,
-  GithubAnnotation,
-  GithubCheckRun,
-  RIGHT,
-} from "../common";
+import { getScannerViolationType } from "../common";
 import { Octokit } from "@octokit/action";
 import { context } from "@actions/github";
-import { BaseReporter } from "./reporter.types";
+import {
+  BaseReporter,
+  GithubAnnotation,
+  GithubCheckRun,
+} from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
+
+export const ERROR = "Error";
+export const RIGHT = "RIGHT";
 
 export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
   private performGithubRequest<T>(body: GithubCheckRun) {
