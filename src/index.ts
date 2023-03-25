@@ -28,6 +28,7 @@ import {
 type PluginInputs = {
   severityThreshold: number;
   strictlyEnforcedRules: string;
+  target: string;
 };
 
 type GithubComment = {
@@ -69,7 +70,7 @@ function initialSetup() {
     severityThreshold: parseInt(getInput("severity-threshold")) || 4,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
     target: context?.payload?.pull_request ? "" : getInput("target"),
-  };
+  } as PluginInputs;
   return {
     inputs,
     pullRequest: context?.payload?.pull_request,
@@ -123,8 +124,7 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
 function filterFindingsToDiffScope(
   findings: ScannerFinding[],
   filePathToChangedLines: Map<string, Set<number>>,
-  inputs: PluginInputs,
-  scannerFlags: ScannerFlags
+  inputs: PluginInputs
 ) {
   console.log(
     "Filtering the findings to just the lines which are part of the pull request..."
@@ -137,7 +137,7 @@ function filterFindingsToDiffScope(
     const relevantLines =
       filePathToChangedLines.get(filePath) || new Set<number>();
     for (let violation of finding.violations) {
-      if (!isInChangedLines(violation, relevantLines) && !scannerFlags.target) {
+      if (!isInChangedLines(violation, relevantLines) && !inputs.target) {
         continue;
       }
       if (!filePathToComments.has(filePath)) {
@@ -419,8 +419,7 @@ async function main() {
   const { filePathToComments, hasHaltingError } = filterFindingsToDiffScope(
     diffFindings,
     filePathToChangedLines,
-    inputs,
-    scannerFlags
+    inputs
   );
   writeComments(existingComments, filePathToComments, hasHaltingError);
 }
