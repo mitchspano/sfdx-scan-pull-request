@@ -286,7 +286,9 @@ async function writeComments(
       if (!existingComment) {
         console.log("No matching comment found, uploading new comment");
         console.log({ comment });
-        await performGithubRequest("POST", comment);
+        await performGithubRequest("POST", comment).catch((error) => {
+          console.log({ error });
+        });
       } else {
         // TODO: It would be nice to resolve comments when there's no longer a scan result for an existing comment but
         // at present, GitHub has no REST api support for this through Octokit (only GraphQL resolution is currently supported).
