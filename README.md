@@ -79,7 +79,7 @@ Note the global installation of the SFDX cli - alternatively, you can use:
 - name: Install SFDX CLI and Scanner
   run: |
     npm install sfdx-cli
-    npx sfdx plugins:install @salesforce/sfdx-scanne
+    npx sfdx plugins:install @salesforce/sfdx-scanner
 ```
 
 for that step.
