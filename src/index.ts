@@ -71,6 +71,7 @@ function initialSetup() {
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
     target: context?.payload?.pull_request ? "" : getInput("target"),
   } as PluginInputs;
+
   return {
     inputs,
     pullRequest: context?.payload?.pull_request,
@@ -359,7 +360,9 @@ function performGithubRequest<T>(
   } catch (err: unknown) {
     if (err instanceof Error) {
       console.error(`${err.message}\nStacktrace: ${err.stack}`);
-      setFailed(`Error while calling out to GitHub`);
+      setFailed(
+        `Error while making ${method} callout out to GitHub comments endpoint`
+      );
       process.exit();
     }
     return Promise.resolve() as Promise<T>;
@@ -404,7 +407,10 @@ async function main() {
     getExistingComments(),
   ]);
 
-  console.log({ filePathToChangedLines });
+  if (!inputs.target) {
+    console.log("Here are the lines which have changed:");
+    console.log({ filePathToChangedLines });
+  }
 
   const filesToScan = getFilesToScan(filePathToChangedLines, inputs.target);
   if (filesToScan.length === 0) {
