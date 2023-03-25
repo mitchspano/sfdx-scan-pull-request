@@ -285,6 +285,7 @@ async function writeComments(
       );
       if (!existingComment) {
         console.log("No matching comment found, uploading new comment");
+        console.log({ comment });
         await performGithubRequest("POST", comment);
       } else {
         // TODO: It would be nice to resolve comments when there's no longer a scan result for an existing comment but
@@ -400,6 +401,8 @@ async function main() {
     ),
     getExistingComments(),
   ]);
+
+  console.log({ filePathToChangedLines });
 
   const filesToScan = getFilesToScan(filePathToChangedLines, inputs.target);
   if (filesToScan.length === 0) {
