@@ -60,7 +60,6 @@ function initialSetup() {
     env: getInput("eslint-env"),
     eslintconfig: getInput("eslintconfig"),
     pmdconfig: getInput("pmdconfig"),
-    target: context?.payload?.pull_request ? "" : getInput("target"),
     tsConfig: getInput("tsconfig"),
   } as ScannerFlags;
 
@@ -69,6 +68,7 @@ function initialSetup() {
   const inputs = {
     severityThreshold: parseInt(getInput("severity-threshold")) || 4,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
+    target: context?.payload?.pull_request ? "" : getInput("target"),
   };
   return {
     inputs,
@@ -281,7 +281,7 @@ async function writeComments(
     }
     for (let comment of comments) {
       const existingComment = existingComments.find((existingComment) =>
-        matchComment(comment, existingComment)
+        commentsMatch(comment, existingComment)
       );
       if (!existingComment) {
         console.log("No matching comment found, uploading new comment");
@@ -294,12 +294,24 @@ async function writeComments(
     }
   }
   if (hasHaltingError) {
-    setFailed(`A serious error has been identified`);
+    setFailed(
+      "One or more errors have been identified within the structure of the code that will need to be resolved before continuing. Please see the comments."
+    );
     process.exit();
   }
 }
 
-function matchComment(commentA: GithubComment, commentB: GithubComment) {
+/**
+ * @description Determines if the comments are the same with the exception of
+ * file property
+ * @param commentA
+ * @param commentB
+ * @returns boolean (if the comments are the same)
+ */
+function commentsMatch(
+  commentA: GithubComment,
+  commentB: GithubComment
+): boolean {
   // Removes the "File" property from each body
   // since that particular column is commit-specific (and thus would always differ)
   const getSanitizedBody = (body: string) =>
@@ -315,6 +327,13 @@ function matchComment(commentA: GithubComment, commentB: GithubComment) {
   );
 }
 
+/**
+ * @description Uses octokit to perform a GitHub request using the REST API
+ * to either get existing or create a new comment on the pull request
+ * @param method POST => create new comment, GET => fetch existing comments
+ * @param optionalBody
+ * @returns Promise<T>
+ */
 function performGithubRequest<T>(
   method: "POST" | "GET",
   optionalBody?: GithubComment
@@ -344,24 +363,26 @@ function performGithubRequest<T>(
   }
 }
 
-function updateScannerTarget(
+/**
+ * @description Constructs an array the files which are to be scanned
+ * @param filePathToChangedLines
+ * @param target
+ * @returns file paths to scan
+ */
+function getFilesToScan(
   filePathToChangedLines: Map<string, Set<number>>,
-  scannerFlags: ScannerFlags
-) {
-  if (!scannerFlags.target) {
-    scannerFlags.target = "";
-    for (let [filePath, changedLines] of filePathToChangedLines) {
-      if (changedLines.size > 0) {
-        scannerFlags.target += filePath + ",";
-      }
-    }
-    if (scannerFlags.target.endsWith(",")) {
-      scannerFlags.target = scannerFlags.target.slice(
-        0,
-        scannerFlags.target.length - 1
-      );
+  target: String
+): String[] {
+  if (target) {
+    return [target];
+  }
+  let pathsWithChangedLines = [];
+  for (let [filePath, changedLines] of filePathToChangedLines) {
+    if (changedLines.size > 0) {
+      pathsWithChangedLines.push(filePath);
     }
   }
+  return pathsWithChangedLines;
 }
 
 /**
@@ -370,7 +391,7 @@ function updateScannerTarget(
 async function main() {
   console.log("Beginning sfdx-scan-pull-request run...");
   const { inputs, pullRequest, scannerFlags } = initialSetup();
-  validateContext(pullRequest, scannerFlags.target);
+  validateContext(pullRequest, inputs.target);
 
   const [filePathToChangedLines, existingComments] = await Promise.all([
     getDiffInPullRequest(
@@ -380,20 +401,23 @@ async function main() {
     getExistingComments(),
   ]);
 
-  updateScannerTarget(filePathToChangedLines, scannerFlags);
-
-  if (scannerFlags.target) {
-    const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
-      scannerFlags
-    );
-    const { filePathToComments, hasHaltingError } = filterFindingsToDiffScope(
-      diffFindings,
-      filePathToChangedLines,
-      inputs,
-      scannerFlags
-    );
-    writeComments(existingComments, filePathToComments, hasHaltingError);
+  const filesToScan = getFilesToScan(filePathToChangedLines, inputs.target);
+  if (filesToScan.length === 0) {
+    console.log("There are no files to scan - exiting now.");
+    return;
   }
+  scannerFlags.target = filesToScan.join(",");
+
+  const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
+    scannerFlags
+  );
+  const { filePathToComments, hasHaltingError } = filterFindingsToDiffScope(
+    diffFindings,
+    filePathToChangedLines,
+    inputs,
+    scannerFlags
+  );
+  writeComments(existingComments, filePathToComments, hasHaltingError);
 }
 
 main();
