@@ -85,7 +85,7 @@ function validateContext(pullRequest: GithubPullRequest, target: string) {
     "Validating that this action was invoked from an acceptable context..."
   );
   if (!pullRequest && !target) {
-    throw new Error(
+    setFailed(
       "This action is only applicable when invoked by a pull request, or with the target property supplied."
     );
   }
@@ -285,9 +285,9 @@ async function writeComments(
       );
       if (!existingComment) {
         console.log("No matching comment found, uploading new comment");
-        console.log({ comment });
         await performGithubRequest("POST", comment).catch((error) => {
-          console.log({ error });
+          setFailed("Error encountered when attempting to write comment.");
+          console.log({ comment, error });
         });
       } else {
         // TODO: It would be nice to resolve comments when there's no longer a scan result for an existing comment but
