@@ -14,6 +14,7 @@
 import { PluginInputs } from "../common";
 import { ScannerViolation } from "../sfdxCli";
 import { Context } from "@actions/github/lib/context";
+import core from "@actions/core";
 
 export type GithubCheckRun = {
   name: string;
@@ -99,5 +100,11 @@ export abstract class BaseReporter<T> implements Reporter {
     _engine: string
   ): { violationType: string } {
     throw new Error("Method not implemented.");
+  }
+
+  checkHasHaltingError() {
+    if (this.hasHaltingError === true) {
+      core.setFailed("A serious error has been identified");
+    }
   }
 }

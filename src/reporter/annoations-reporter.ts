@@ -25,6 +25,11 @@ export const ERROR = "Error";
 export const RIGHT = "RIGHT";
 
 export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
+  /**
+   * @description Executes the REST request to submit the Check Run to GitHub
+   * @param body
+   * @private
+   */
   private performGithubRequest<T>(body: GithubCheckRun) {
     const octokit = new Octokit();
     const owner = context.repo.owner;
@@ -34,10 +39,13 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
 
     return octokit.request(endpoint, body) as Promise<T>;
   }
+
+  /**
+   * @description Writes the Check Run to GitHub
+   */
   async write() {
     console.log("Creating Check Runs using GitHub REST API...");
 
-    // TODO: Change
     let conclusion: "failure" | "success" | "neutral";
     if (this.hasHaltingError) {
       conclusion = "failure";
@@ -62,11 +70,24 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
         },
       };
 
+      this.checkHasHaltingError();
+
       await this.performGithubRequest(request);
     }
   }
 
-  translateViolationToReport(filePath: string, violation: ScannerViolation, engine: string) {
+  /**
+   * @description Translates a violation object into a comment
+   *  with a formatted body
+   * @param filePath File path that the violation took place in
+   * @param violation sfdx-scanner violation
+   * @param engine The engine that discovered the violation
+   */
+  translateViolationToReport(
+    filePath: string,
+    violation: ScannerViolation,
+    engine: string
+  ) {
     const violationType = getScannerViolationType(
       this.inputs,
       violation,
