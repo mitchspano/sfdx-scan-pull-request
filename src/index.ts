@@ -125,7 +125,7 @@ function filterFindingsToDiffScope(
         continue;
       }
 
-      const { violationType } = reporter.translate(
+      const { violationType } = reporter.translateViolationToReport(
         filePath,
         violation,
         finding.engine

@@ -130,7 +130,7 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
     );
   }
 
-  translate(filePath: string, violation: ScannerViolation, engine: string) {
+  translateViolationToReport(filePath: string, violation: ScannerViolation, engine: string) {
     const startLine = parseInt(violation.line);
     let endLine = violation.endLine
       ? parseInt(violation.endLine)

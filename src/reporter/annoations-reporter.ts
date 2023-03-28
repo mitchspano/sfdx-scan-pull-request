@@ -66,7 +66,7 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
     }
   }
 
-  translate(filePath: string, violation: ScannerViolation, engine: string) {
+  translateViolationToReport(filePath: string, violation: ScannerViolation, engine: string) {
     const violationType = getScannerViolationType(
       this.inputs,
       violation,

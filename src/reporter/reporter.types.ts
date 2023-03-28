@@ -69,7 +69,7 @@ export type ReporterProps = {
 
 export interface Reporter {
   write(): void;
-  translate(
+  translateViolationToReport(
     filePath: string,
     violation: ScannerViolation,
     engine: string
@@ -93,7 +93,7 @@ export abstract class BaseReporter<T> implements Reporter {
   write(): void {
     throw new Error("Method not implemented.");
   }
-  translate(
+  translateViolationToReport(
     _filePath: string,
     _violation: ScannerViolation,
     _engine: string
