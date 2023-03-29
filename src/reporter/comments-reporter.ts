@@ -25,7 +25,6 @@ import { ScannerViolation } from "../sfdxCli";
 const HIDDEN_COMMENT_PREFIX = "<!--sfdx-scanner-->";
 
 export class CommentsReporter extends BaseReporter<GithubComment> {
-
   /**
    * Read and write GitHub comments
    * @param method GET (read) or POST (write)

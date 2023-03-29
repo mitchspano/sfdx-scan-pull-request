@@ -103,7 +103,7 @@ export abstract class BaseReporter<T> implements Reporter {
   }
 
   checkHasHaltingError() {
-    if (this.hasHaltingError === true) {
+    if (this.hasHaltingError) {
       core.setFailed("A serious error has been identified");
     }
   }

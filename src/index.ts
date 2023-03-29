@@ -160,7 +160,13 @@ function isInChangedLines(
   return true;
 }
 
-function updateScannerTarget(
+/**
+ * @description Constructs an array the files which are to be scanned
+ * @param filePathToChangedLines
+ * @param target
+ * @returns file paths to scan
+ */
+function getFilesToScan(
   filePathToChangedLines: Map<string, Set<number>>,
   target: String
 ): String[] {
