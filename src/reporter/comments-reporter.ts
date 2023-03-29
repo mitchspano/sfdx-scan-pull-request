@@ -25,6 +25,13 @@ import { ScannerViolation } from "../sfdxCli";
 const HIDDEN_COMMENT_PREFIX = "<!--sfdx-scanner-->";
 
 export class CommentsReporter extends BaseReporter<GithubComment> {
+
+  /**
+   * Read and write GitHub comments
+   * @param method GET (read) or POST (write)
+   * @param optionalBody Body is required when writing a new comment
+   * @private
+   */
   private performGithubRequest<T>(
     method: "POST" | "GET",
     optionalBody?: GithubComment
@@ -45,6 +52,11 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
     ) as Promise<T>;
   }
 
+  /**
+   * Delete a single GitHub comment
+   * @param comment Comment to delete
+   * @private
+   */
   private async performGithubDeleteRequest(comment: GithubExistingComment) {
     const octokit = new Octokit();
     const owner = context.repo.owner;
