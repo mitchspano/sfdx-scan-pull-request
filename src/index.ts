@@ -38,7 +38,6 @@ function initialSetup() {
     env: getInput("eslint-env"),
     eslintconfig: getInput("eslintconfig"),
     pmdconfig: getInput("pmdconfig"),
-    target: context?.payload?.pull_request ? "" : getInput("target"),
     tsConfig: getInput("tsconfig"),
   } as ScannerFlags;
 
@@ -76,7 +75,7 @@ function validateContext(pullRequest: GithubPullRequest, target: string) {
     "Validating that this action was invoked from an acceptable context..."
   );
   if (!pullRequest && !target) {
-    throw new Error(
+    setFailed(
       "This action is only applicable when invoked by a pull request, or with the target property supplied."
     );
   }
@@ -147,14 +146,14 @@ function isInChangedLines(
   relevantLines: Set<number>
 ) {
   if (!violation.endLine) {
-    return relevantLines && relevantLines.has(parseInt(violation.line));
+    return relevantLines.has(parseInt(violation.line));
   }
   for (
     let i = parseInt(violation.line);
     i <= parseInt(violation.endLine);
     i++
   ) {
-    if (!relevantLines || !relevantLines.has(i)) {
+    if (relevantLines.has(i) == false) {
       return false;
     }
   }
@@ -163,22 +162,18 @@ function isInChangedLines(
 
 function updateScannerTarget(
   filePathToChangedLines: Map<string, Set<number>>,
-  scannerFlags: ScannerFlags
-) {
-  if (!scannerFlags.target) {
-    scannerFlags.target = "";
-    for (let [filePath, changedLines] of filePathToChangedLines) {
-      if (changedLines.size > 0) {
-        scannerFlags.target += filePath + ",";
-      }
-    }
-    if (scannerFlags.target.endsWith(",")) {
-      scannerFlags.target = scannerFlags.target.slice(
-        0,
-        scannerFlags.target.length - 1
-      );
+  target: String
+): String[] {
+  if (target) {
+    return [target];
+  }
+  let pathsWithChangedLines = [];
+  for (let [filePath, changedLines] of filePathToChangedLines) {
+    if (changedLines.size > 0) {
+      pathsWithChangedLines.push(filePath);
     }
   }
+  return pathsWithChangedLines;
 }
 
 /**
@@ -187,14 +182,24 @@ function updateScannerTarget(
 async function main() {
   console.log("Beginning sfdx-scan-pull-request run...");
   const { pullRequest, scannerFlags, reporter, inputs } = initialSetup();
-  validateContext(pullRequest, scannerFlags.target);
+  validateContext(pullRequest, inputs.target);
 
   const filePathToChangedLines = await getDiffInPullRequest(
     [pullRequest?.base?.ref, pullRequest?.head?.ref],
     pullRequest?.base?.repo?.clone_url
   );
 
-  updateScannerTarget(filePathToChangedLines, scannerFlags);
+  if (!inputs.target) {
+    console.log("Here are the lines which have changed:");
+    console.log({ filePathToChangedLines });
+  }
+
+  const filesToScan = getFilesToScan(filePathToChangedLines, inputs.target);
+  if (filesToScan.length === 0) {
+    console.log("There are no files to scan - exiting now.");
+    return;
+  }
+  scannerFlags.target = filesToScan.join(",");
 
   if (scannerFlags.target) {
     const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(

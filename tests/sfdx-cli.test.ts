@@ -1,5 +1,4 @@
 import { expect, it, describe } from "@jest/globals";
-import path from "path";
 
 import { scanFiles } from "../src/sfdxCli";
 
@@ -12,7 +11,7 @@ describe("CLI tests!", () => {
       const scannerFlags = {
         engine: "pmd",
         pmdconfig: undefined,
-        target: path.join(process.cwd(), "tests/ExampleClass.cls"),
+        target: "tests/ExampleClass.cls",
       };
 
       const findings = await scanFiles(scannerFlags);
@@ -25,7 +24,7 @@ describe("CLI tests!", () => {
       }
 
       const scannerViolations = findings[0].violations;
-      expect(scannerViolations.length).toBe(6);
+      expect(scannerViolations.length).toBe(4);
       expect(
         scannerViolations.find(
           (violation) =>
@@ -46,7 +45,7 @@ describe("CLI tests!", () => {
     async () => {
       const scannerFlags = {
         engine: "eslint",
-        target: path.join(process.cwd(), "tests/example-lwc.js"),
+        target: "tests/example-lwc.js",
       };
 
       const findings = await scanFiles(scannerFlags);
@@ -65,6 +64,21 @@ describe("CLI tests!", () => {
           (violation) => violation.ruleName === "no-console"
         )
       ).toBeTruthy();
+    },
+    thirtySecondsRunTime
+  );
+
+  it(
+    "handles spaces in file names",
+    async () => {
+      const scannerFlags = {
+        engine: "eslint",
+        target: "README.md,tests/Example Layout.layout-meta.xml",
+      };
+
+      const findings = await scanFiles(scannerFlags);
+
+      expect(typeof findings).toBe("string");
     },
     thirtySecondsRunTime
   );

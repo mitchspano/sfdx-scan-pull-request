@@ -52,6 +52,8 @@ const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
   let result = null as T;
   try {
     const cliCommand = `npx sfdx ${commandName} ${cliArgs.join(" ")}`;
+    console.log("Running scan...");
+    console.log(cliCommand);
     result = (
       JSON.parse(execSync(cliCommand).toString()) as SfdxCommandResult<T>
     ).result;
@@ -62,6 +64,7 @@ const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
 };
 
 export async function scanFiles(scannerFlags: ScannerFlags) {
+  scannerFlags.target = `"` + scannerFlags.target + `"`;
   const scannerCliArgs = (
     Object.keys(scannerFlags) as Array<keyof ScannerFlags>
   )
