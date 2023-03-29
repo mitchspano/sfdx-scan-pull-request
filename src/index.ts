@@ -48,10 +48,10 @@ function initialSetup() {
     severityThreshold: parseInt(getInput("severity-threshold")) || 4,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
     deleteResolvedComments: getInput("delete-resolved-comments") === "true",
-    target: getInput("target"),
+    target: context?.payload?.pull_request ? "" : getInput("target"),
   };
 
-  const params = {
+  const reporterParams = {
     inputs,
     context,
   };
@@ -62,8 +62,8 @@ function initialSetup() {
     scannerFlags,
     reporter:
       inputs.reportMode === "comments"
-        ? new CommentsReporter(params)
-        : new AnnotationsReporter(params),
+        ? new CommentsReporter(reporterParams)
+        : new AnnotationsReporter(reporterParams),
   };
 }
 
@@ -118,9 +118,7 @@ function filterFindingsToDiffScope(
     const relevantLines =
       filePathToChangedLines.get(filePath) || new Set<number>();
     for (let violation of finding.violations) {
-      const isNotChangedLines = !isInChangedLines(violation, relevantLines);
-      const isEmptyTarget = !inputs.target;
-      if (isNotChangedLines && isEmptyTarget) {
+      if (!isInChangedLines(violation, relevantLines) && !inputs.target) {
         continue;
       }
 
@@ -207,21 +205,19 @@ async function main() {
   }
   scannerFlags.target = filesToScan.join(",");
 
-  if (scannerFlags.target) {
-    const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
-      scannerFlags
-    );
-    const { hasHaltingError } = filterFindingsToDiffScope(
-      diffFindings,
-      filePathToChangedLines,
-      inputs,
-      reporter
-    );
-    await reporter.write();
-    if (hasHaltingError) {
-      setFailed(`A serious error has been identified`);
-      process.exit();
-    }
+  const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
+    scannerFlags
+  );
+  const { hasHaltingError } = filterFindingsToDiffScope(
+    diffFindings,
+    filePathToChangedLines,
+    inputs,
+    reporter
+  );
+  await reporter.write();
+  if (hasHaltingError) {
+    setFailed(`A serious error has been identified`);
+    process.exit();
   }
 }
 
