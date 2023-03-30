@@ -12,19 +12,12 @@
  */
 
 import parse from "parse-diff";
-import { simpleGit } from "simple-git";
 import { context } from "@actions/github";
+import { execSync } from "child_process";
 
 const DESTINATION_REMOTE_NAME = "destination";
 
 export type GithubPullRequest = typeof context.payload.pull_request | undefined;
-
-export const git = simpleGit({
-  baseDir: process.cwd(),
-  binary: "git",
-  maxConcurrentProcesses: 6,
-  trimmed: false,
-});
 
 /**
  * @description Calculates the diff for all files within the pull request and
@@ -36,8 +29,8 @@ export async function getDiffInPullRequest(
 ) {
   console.log("Getting difference within the pull request ...", diffArgs);
   if (destination) {
-    await git.addRemote(DESTINATION_REMOTE_NAME, destination);
-    await git.remote(["update"]);
+    execSync(`git remote add -f destination ${destination}`);
+    execSync(`git remote update`);
   }
 
   diffArgs = diffArgs
@@ -47,7 +40,7 @@ export async function getDiffInPullRequest(
         `${index === 0 ? "origin" : DESTINATION_REMOTE_NAME}/${diffArg}`
     );
 
-  const diffString = await git.diff(diffArgs);
+  const diffString = execSync(`git diff ${diffArgs.join("...")}`).toString();
   const files = parse(diffString);
 
   const filePathToChangedLines = new Map<string, Set<number>>();
