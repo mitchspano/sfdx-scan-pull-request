@@ -11,6 +11,7 @@
    limitations under the License.
  */
 
+import { setFailed } from "@actions/core";
 import parse from "parse-diff";
 import { context } from "@actions/github";
 import { execSync } from "child_process";
@@ -35,9 +36,16 @@ export async function getDiffInPullRequest(
     execSync(`git remote update`);
   }
 
-  const diffString = execSync(
-    `git diff destination/${headRef}...origin/${baseRef}`
-  ).toString();
+  let diffString;
+  try {
+    diffString = execSync(
+      `git diff destination/${baseRef}...origin/${headRef}`
+    ).toString();
+  } catch (error) {
+    console.error(error);
+    setFailed("Error encountered when attempting to get git diff.");
+    process.exit();
+  }
   const files = parse(diffString);
 
   const filePathToChangedLines = new Map<string, Set<number>>();
