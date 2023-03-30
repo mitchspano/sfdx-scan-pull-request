@@ -36,7 +36,7 @@ export async function getDiffInPullRequest(
   }
 
   const diffString = execSync(
-    `git diff destination/${baseRef}...origin/${headRef}`
+    `git diff destination/${headRef}...origin/${baseRef}`
   ).toString();
   const files = parse(diffString);
 
