@@ -15,8 +15,6 @@ import parse from "parse-diff";
 import { context } from "@actions/github";
 import { execSync } from "child_process";
 
-const DESTINATION_REMOTE_NAME = "destination";
-
 export type GithubPullRequest = typeof context.payload.pull_request | undefined;
 
 /**
@@ -24,23 +22,22 @@ export type GithubPullRequest = typeof context.payload.pull_request | undefined;
  * populates a map of filePath -> Set of changed line numbers
  */
 export async function getDiffInPullRequest(
-  diffArgs: string[],
+  baseRef: string,
+  headRef: string,
   destination?: string
 ) {
-  console.log("Getting difference within the pull request ...", diffArgs);
+  console.log("Getting difference within the pull request ...", {
+    baseRef,
+    headRef,
+  });
   if (destination) {
     execSync(`git remote add -f destination ${destination}`);
     execSync(`git remote update`);
   }
 
-  diffArgs = diffArgs
-    .filter((arg) => arg)
-    .map(
-      (diffArg, index) =>
-        `${index === 0 ? "origin" : DESTINATION_REMOTE_NAME}/${diffArg}`
-    );
-
-  const diffString = execSync(`git diff ${diffArgs.join("...")}`).toString();
+  const diffString = execSync(
+    `git diff destination/${baseRef}...origin/${headRef}`
+  ).toString();
   const files = parse(diffString);
 
   const filePathToChangedLines = new Map<string, Set<number>>();

@@ -401,7 +401,8 @@ async function main() {
 
   const [filePathToChangedLines, existingComments] = await Promise.all([
     getDiffInPullRequest(
-      [pullRequest?.base?.ref, pullRequest?.head?.ref],
+      pullRequest?.base?.ref,
+      pullRequest?.head?.ref,
       pullRequest?.base?.repo?.clone_url
     ),
     getExistingComments(),
