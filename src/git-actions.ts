@@ -11,10 +11,12 @@
    limitations under the License.
  */
 
-import { setFailed } from "@actions/core";
 import parse from "parse-diff";
+import fs from "fs";
 import { context } from "@actions/github";
 import { execSync } from "child_process";
+
+const DIFF_OUTPUT = "diffBetweenCurrentAndParentBranch.txt";
 
 export type GithubPullRequest = typeof context.payload.pull_request | undefined;
 
@@ -35,19 +37,14 @@ export async function getDiffInPullRequest(
     execSync(`git remote add -f destination ${destination}`);
     execSync(`git remote update`);
   }
-
-  let diffString;
-  try {
-    diffString = execSync(
-      `git diff destination/${baseRef}...origin/${headRef}`
-    ).toString();
-  } catch (error) {
-    console.error(error);
-    setFailed("Error encountered when attempting to get git diff.");
-    process.exit();
-  }
-  const files = parse(diffString);
-
+  /**
+   * Keeping git diff output in memory throws `code: 'ENOBUFS'`  error when
+   * called from within action. Writing to file, then reading avoids this error.
+   */
+  execSync(
+    `git diff destination/${baseRef}...origin/${headRef} > ${DIFF_OUTPUT}`
+  );
+  const files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
   const filePathToChangedLines = new Map<string, Set<number>>();
   for (let file of files) {
     if (file.to && file.to !== "/dev/null") {
