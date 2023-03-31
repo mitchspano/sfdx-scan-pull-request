@@ -30,5 +30,6 @@ jobs:
           severity-threshold: 4
           engine: pmd
           target: tests
+          eslintconfig: .eslintrc.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,7 +2,7 @@ import { expect, it, describe } from "@jest/globals";
 import { execSync } from "child_process";
 import { writeFileSync, unlinkSync } from "fs";
 
-import { git, getDiffInPullRequest } from "../src/git-actions";
+import { getDiffInPullRequest } from "../src/git-actions";
 
 // useful for local testing; omitted via CI runs due to ambiguous references
 describe.skip("Git action tests", () => {
@@ -10,7 +10,7 @@ describe.skip("Git action tests", () => {
     const testFilePath = "github-test-file";
 
     writeFileSync(testFilePath, "some data to write");
-    git.add(testFilePath);
+    execSync(`git add ${testFilePath}`);
 
     const diff = await getDiffInPullRequest([
       execSync("git rev-parse --abbrev-ref HEAD").toString().trim(),
@@ -25,7 +25,7 @@ describe.skip("Git action tests", () => {
       throw _;
     } finally {
       unlinkSync(testFilePath);
-      git.add(testFilePath);
+      execSync(`git add ${testFilePath}`);
     }
   });
 
@@ -34,23 +34,25 @@ describe.skip("Git action tests", () => {
   it(
     "adds remote origin & properly points PR args to git remotes",
     async () => {
-      try {
-        await git.removeRemote("destination");
-      } catch (_) {
-        // no-op
-      }
+      const removeRemote = () => {
+        try {
+          execSync("git remote remove destination");
+        } catch (_) {
+          // no-op
+        }
+      };
+
+      removeRemote();
       const pullRequestArgs = ["main", "main"];
       await getDiffInPullRequest(
         pullRequestArgs,
         "https://github.com/mitchspano/sfdx-scan-pull-request.git"
       );
 
-      expect(
-        (await git.getRemotes()).filter(
-          (remote) => remote.name === "destination"
-        )
-      ).toBeTruthy();
-      await git.removeRemote("destination");
+      const remotes = execSync("git remote").toString();
+
+      expect(remotes.indexOf("destination") > -1).toBeTruthy();
+      removeRemote();
     },
     fiftySecondsRunTime
   );
