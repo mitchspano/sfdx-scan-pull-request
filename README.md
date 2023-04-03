@@ -104,7 +104,6 @@ This package includes the following version of the required dependencies:
 | @actions/github | 5.0.3            |
 | @octokit/action | 4.0.4            |
 | parse-diff      | 0.9.0            |
-| simple-git      | 3.17.0           |
 
  <!-- @salesforce/sfdx-scanner (sfdx-cli plugin) 2.13.7            -->
 

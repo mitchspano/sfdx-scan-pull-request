@@ -189,9 +189,10 @@ async function main() {
   validateContext(pullRequest, inputs.target);
 
   const filePathToChangedLines = await getDiffInPullRequest(
-    [pullRequest?.base?.ref, pullRequest?.head?.ref],
-    pullRequest?.base?.repo?.clone_url
-  );
+      pullRequest?.base?.ref,
+      pullRequest?.head?.ref,
+      pullRequest?.base?.repo?.clone_url
+    )
 
   if (!inputs.target) {
     console.log("Here are the lines which have changed:");
