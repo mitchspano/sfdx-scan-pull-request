@@ -215,7 +215,14 @@ async function main() {
     inputs,
     reporter
   );
-  await reporter.write();
+
+  try {
+    await reporter.write();
+  } catch (e) {
+    console.error(e);
+    setFailed("An error occurred while trying to write to GitHub");
+  }
+
   if (hasHaltingError) {
     setFailed(`A serious error has been identified`);
     process.exit();
