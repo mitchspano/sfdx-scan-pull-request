@@ -14,7 +14,7 @@
 import { PluginInputs } from "../common";
 import { ScannerViolation } from "../sfdxCli";
 import { Context } from "@actions/github/lib/context";
-import core from "@actions/core";
+import { setFailed } from "@actions/core";
 
 export type GithubCheckRun = {
   name: string;
@@ -104,7 +104,7 @@ export abstract class BaseReporter<T> implements Reporter {
 
   checkHasHaltingError() {
     if (this.hasHaltingError) {
-      core.setFailed(
+      setFailed(
         '"One or more errors have been identified within the structure of the code that will need to be resolved before continuing.'
       );
     }
