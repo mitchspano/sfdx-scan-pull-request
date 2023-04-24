@@ -23,8 +23,8 @@ inputs:
     description: "Use comments or check-runs for reporting errors"
     default: 'check-runs'
   delete-resolved-comments:
-    description: "Delete comments once the issue has been resolved"
-    default: false
+    description: "Set `true` to delete comments once the issue has been resolved"
+    default: 'false'
 runs:
   using: "node16"
   main: "dist/index.js"

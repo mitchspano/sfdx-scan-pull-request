@@ -209,7 +209,7 @@ async function main() {
   const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
     scannerFlags
   );
-  const { hasHaltingError } = filterFindingsToDiffScope(
+  filterFindingsToDiffScope(
     diffFindings,
     filePathToChangedLines,
     inputs,
@@ -221,11 +221,6 @@ async function main() {
   } catch (e) {
     console.error(e);
     setFailed("An error occurred while trying to write to GitHub");
-  }
-
-  if (hasHaltingError) {
-    setFailed(`A serious error has been identified`);
-    process.exit();
   }
 }
 

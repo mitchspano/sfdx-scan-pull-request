@@ -105,7 +105,7 @@ export abstract class BaseReporter<T> implements Reporter {
   checkHasHaltingError() {
     if (this.hasHaltingError) {
       setFailed(
-        '"One or more errors have been identified within the structure of the code that will need to be resolved before continuing.'
+        "One or more errors have been identified within the structure of the code that will need to be resolved before continuing."
       );
     }
   }
