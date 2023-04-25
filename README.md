@@ -42,6 +42,16 @@ Optionally provide this to scan a whole directory instead of just the diff. If t
 
 Location of tsconfig.json file
 
+## `report-mode`
+
+Details which way to report issues back to GitHub, can be either:
+- `check-runs` - Shows findings as annotations on the PR (default)
+- `comments` - Shows findings as comments
+
+## `delete-resolved-comments`
+
+When set to true, will delete resolved comments from a PR. Defaults to `false`. Will do nothing unless `report-mode` is set to `comments`
+
 ## Example usage
 
 ```

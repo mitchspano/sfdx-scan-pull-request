@@ -19,6 +19,12 @@ inputs:
     description: "Optional target to specify a whole directory to run, as opposed to just the diff of a pull request"
   tsconfig:
     description: "Location of tsconfig.json file."
+  report-mode:
+    description: "Use comments or check-runs for reporting errors"
+    default: 'check-runs'
+  delete-resolved-comments:
+    description: "Set `true` to delete comments once the issue has been resolved"
+    default: 'false'
 runs:
   using: "node16"
   main: "dist/index.js"

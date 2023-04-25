@@ -12,7 +12,6 @@
  */
 
 import { getInput, setFailed } from "@actions/core";
-import { Octokit } from "@octokit/action";
 import { context } from "@actions/github";
 
 import { getDiffInPullRequest, GithubPullRequest } from "./git-actions";
@@ -22,33 +21,11 @@ import {
   ScannerFinding,
   ScannerFlags,
   ScannerViolation,
-  ScannerViolationType,
 } from "./sfdxCli";
-
-type PluginInputs = {
-  severityThreshold: number;
-  strictlyEnforcedRules: string;
-  target: string;
-};
-
-type GithubComment = {
-  commit_id: string;
-  path: string;
-  start_line: number;
-  start_side: GithubCommentSide;
-  side: GithubCommentSide;
-  line: number;
-  body: string;
-  url?: string;
-};
-
-type GithubExistingComment = GithubComment & {
-  user: {
-    type: "Bot" | "User";
-  };
-};
-
-type GithubCommentSide = "RIGHT";
+import { PluginInputs } from "./common";
+import { CommentsReporter } from "./reporter/comments-reporter";
+import { AnnotationsReporter } from "./reporter/annoations-reporter";
+import { Reporter } from "./reporter/reporter.types";
 
 /**
  * @description Collects and verifies the inputs from the action context and metadata
@@ -66,16 +43,27 @@ function initialSetup() {
 
   // TODO: validate inputs. Technically the scanner's "max" violation level is 3,
   // where: 1 (high), 2 (moderate), and 3 (low)
-  const inputs = {
+  const inputs: PluginInputs = {
+    reportMode: getInput("report-mode") || "check-runs",
     severityThreshold: parseInt(getInput("severity-threshold")) || 4,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
+    deleteResolvedComments: getInput("delete-resolved-comments") === "true",
     target: context?.payload?.pull_request ? "" : getInput("target"),
-  } as PluginInputs;
+  };
+
+  const reporterParams = {
+    inputs,
+    context,
+  };
 
   return {
     inputs,
     pullRequest: context?.payload?.pull_request,
     scannerFlags,
+    reporter:
+      inputs.reportMode === "comments"
+        ? new CommentsReporter(reporterParams)
+        : new AnnotationsReporter(reporterParams),
   };
 }
 
@@ -91,14 +79,6 @@ function validateContext(pullRequest: GithubPullRequest, target: string) {
       "This action is only applicable when invoked by a pull request, or with the target property supplied."
     );
   }
-}
-
-async function getExistingComments() {
-  console.log("Getting existing comments using GitHub REST API...");
-
-  return (await performGithubRequest<GithubExistingComment[]>("GET")).filter(
-    (existingComment) => existingComment.user.type === "Bot"
-  );
 }
 
 /**
@@ -125,12 +105,12 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
 function filterFindingsToDiffScope(
   findings: ScannerFinding[],
   filePathToChangedLines: Map<string, Set<number>>,
-  inputs: PluginInputs
+  inputs: PluginInputs,
+  reporter: Reporter
 ) {
   console.log(
     "Filtering the findings to just the lines which are part of the pull request..."
   );
-  const filePathToComments = new Map<string, GithubComment[]>();
   let hasHaltingError = false;
 
   for (let finding of findings) {
@@ -141,23 +121,18 @@ function filterFindingsToDiffScope(
       if (!isInChangedLines(violation, relevantLines) && !inputs.target) {
         continue;
       }
-      if (!filePathToComments.has(filePath)) {
-        filePathToComments.set(filePath, []);
-      }
 
-      const { comment, violationType } = translateViolationToComment(
+      const { violationType } = reporter.translateViolationToReport(
         filePath,
         violation,
-        finding.engine,
-        inputs
+        finding.engine
       );
       if (violationType === "Error") {
         hasHaltingError = true;
       }
-      filePathToComments.get(filePath)?.push(comment);
     }
   }
-  return { filePathToComments, hasHaltingError };
+  return { hasHaltingError };
 }
 
 /**
@@ -181,192 +156,6 @@ function isInChangedLines(
     }
   }
   return true;
-}
-
-/**
- * @description Translates a violation object into a comment
- * with a formatted body
- * @returns Comment
- */
-function translateViolationToComment(
-  filePath: string,
-  violation: ScannerViolation,
-  engine: string,
-  inputs: PluginInputs
-): { comment: GithubComment; violationType: ScannerViolationType } {
-  const startLine = parseInt(violation.line);
-  let endLine = violation.endLine
-    ? parseInt(violation.endLine)
-    : parseInt(violation.line);
-  if (endLine === startLine) {
-    endLine++;
-  }
-
-  const violationType = getScannerViolationType(inputs, violation, engine);
-  const commit_id = context.payload.pull_request
-    ? context.payload.pull_request.head.sha
-    : context.sha;
-
-  const commentHeader = `| Engine | Category | Rule | Severity | Type | Message | File |
-  | --- | --- | --- | --- | --- | --- | --- |`;
-  return {
-    comment: {
-      commit_id,
-      path: filePath,
-      start_line: startLine,
-      start_side: "RIGHT",
-      side: "RIGHT",
-      line: endLine,
-      body: `${commentHeader}
-| ${engine} | ${violation.category} | ${violation.ruleName} | ${
-        violation.severity
-      } | ${violationType} | [${violation.message.trim()}](${
-        violation.url
-      }) | [${filePath}](${getGithubFilePath(commit_id, filePath)}) |`,
-    },
-    violationType,
-  };
-}
-
-function getGithubFilePath(commitId: string, filePath: string) {
-  return ["..", "tree", commitId, filePath].join("/");
-}
-
-/**
- * @description Calculates if a violation will cause halting or not.
- * @returns Boolean
- */
-function getScannerViolationType(
-  inputs: PluginInputs,
-  violation: ScannerViolation,
-  engine: string
-): ScannerViolationType {
-  if (inputs.severityThreshold <= violation.severity) {
-    return "Error";
-  }
-  if (!inputs.strictlyEnforcedRules) {
-    return "Warning";
-  }
-  let violationDetail = {
-    engine: engine,
-    category: violation.category,
-    rule: violation.ruleName,
-  };
-  for (let enforcedRule of JSON.parse(inputs.strictlyEnforcedRules) as {
-    [key in string]: string;
-  }[]) {
-    if (
-      Object.entries(violationDetail).toString() ===
-      Object.entries(enforcedRule).toString()
-    ) {
-      return "Error";
-    }
-  }
-  return "Warning";
-}
-
-/**
- * @description Writes the relevant comments to the GitHub pull request.
- * Uses the octokit to post the comments to the PR.
- */
-async function writeComments(
-  existingComments: GithubComment[],
-  filePathToComments: Map<string, GithubComment[]>,
-  hasHaltingError: boolean
-) {
-  console.log("Writing comments using GitHub REST API...");
-
-  for (let [_, comments] of filePathToComments) {
-    if (!comments) {
-      continue;
-    }
-    for (let comment of comments) {
-      const existingComment = existingComments.find((existingComment) =>
-        commentsMatch(comment, existingComment)
-      );
-      if (!existingComment) {
-        console.log("No matching comment found, uploading new comment");
-        await performGithubRequest("POST", comment).catch((error) => {
-          setFailed("Error encountered when attempting to write comment.");
-          console.log({ comment, error });
-        });
-      } else {
-        // TODO: It would be nice to resolve comments when there's no longer a scan result for an existing comment but
-        // at present, GitHub has no REST api support for this through Octokit (only GraphQL resolution is currently supported).
-        console.log(`Skipping existing comment ${existingComment.url}`);
-      }
-    }
-  }
-  if (hasHaltingError) {
-    setFailed(
-      "One or more errors have been identified within the structure of the code that will need to be resolved before continuing. Please see the comments."
-    );
-    process.exit();
-  }
-}
-
-/**
- * @description Determines if the comments are the same with the exception of
- * file property
- * @param commentA
- * @param commentB
- * @returns boolean (if the comments are the same)
- */
-function commentsMatch(
-  commentA: GithubComment,
-  commentB: GithubComment
-): boolean {
-  // Removes the "File" property from each body
-  // since that particular column is commit-specific (and thus would always differ)
-  const getSanitizedBody = (body: string) =>
-    body
-      .split("|")
-      .filter((bodySection) => bodySection)
-      .slice(0, -1)
-      .toString();
-  return (
-    commentA.line === commentB.line &&
-    getSanitizedBody(commentA.body) === getSanitizedBody(commentB.body) &&
-    commentA.path === commentB.path
-  );
-}
-
-/**
- * @description Uses octokit to perform a GitHub request using the REST API
- * to either get existing or create a new comment on the pull request
- * @param method POST => create new comment, GET => fetch existing comments
- * @param optionalBody
- * @returns Promise<T>
- */
-function performGithubRequest<T>(
-  method: "POST" | "GET",
-  optionalBody?: GithubComment
-) {
-  const octokit = new Octokit();
-  const owner = context.repo.owner;
-  const repo = context.repo.repo;
-  const prNumber = context.payload.pull_request?.number;
-
-  const endpoint = `${method} /repos/${owner}/${repo}/${
-    prNumber ? `pulls/${prNumber}` : `commits/${context.sha}`
-  }/comments`;
-
-  try {
-    return (
-      method === "POST"
-        ? octokit.request(endpoint, optionalBody)
-        : octokit.paginate(endpoint)
-    ) as Promise<T>;
-  } catch (err: unknown) {
-    if (err instanceof Error) {
-      console.error(`${err.message}\nStacktrace: ${err.stack}`);
-      setFailed(
-        `Error while making ${method} callout out to GitHub comments endpoint`
-      );
-      process.exit();
-    }
-    return Promise.resolve() as Promise<T>;
-  }
 }
 
 /**
@@ -396,17 +185,14 @@ function getFilesToScan(
  */
 async function main() {
   console.log("Beginning sfdx-scan-pull-request run...");
-  const { inputs, pullRequest, scannerFlags } = initialSetup();
+  const { pullRequest, scannerFlags, reporter, inputs } = initialSetup();
   validateContext(pullRequest, inputs.target);
 
-  const [filePathToChangedLines, existingComments] = await Promise.all([
-    getDiffInPullRequest(
-      pullRequest?.base?.ref,
-      pullRequest?.head?.ref,
-      pullRequest?.base?.repo?.clone_url
-    ),
-    getExistingComments(),
-  ]);
+  const filePathToChangedLines = await getDiffInPullRequest(
+    pullRequest?.base?.ref,
+    pullRequest?.head?.ref,
+    pullRequest?.base?.repo?.clone_url
+  );
 
   if (!inputs.target) {
     console.log("Here are the lines which have changed:");
@@ -423,12 +209,19 @@ async function main() {
   const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
     scannerFlags
   );
-  const { filePathToComments, hasHaltingError } = filterFindingsToDiffScope(
+  filterFindingsToDiffScope(
     diffFindings,
     filePathToChangedLines,
-    inputs
+    inputs,
+    reporter
   );
-  writeComments(existingComments, filePathToComments, hasHaltingError);
+
+  try {
+    await reporter.write();
+  } catch (e) {
+    console.error(e);
+    setFailed("An error occurred while trying to write to GitHub");
+  }
 }
 
 main();
