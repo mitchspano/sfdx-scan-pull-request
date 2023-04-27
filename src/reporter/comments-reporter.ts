@@ -77,7 +77,13 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
         this.matchComment(comment, existingComment)
       );
       if (!existingComment) {
-        await this.performGithubRequest("POST", comment);
+        try {
+          await this.performGithubRequest("POST", comment);
+        } catch (error) {
+          console.error(
+            "Error when writing comments: " + JSON.stringify(error, null, 2)
+          );
+        }
       } else {
         console.log(`Skipping existing comment ${existingComment.url}`);
       }
@@ -126,13 +132,22 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
    */
   private async getExistingComments() {
     console.log("Getting existing comments using GitHub REST API...");
-    return (
-      await this.performGithubRequest<GithubExistingComment[]>("GET")
-    ).filter(
-      (comment) =>
-        comment.body.includes(HIDDEN_COMMENT_PREFIX) &&
-        comment.user.type === "Bot"
-    );
+    let result;
+    try {
+      result = (
+        await this.performGithubRequest<GithubExistingComment[]>("GET")
+      ).filter(
+        (comment) =>
+          comment.body.includes(HIDDEN_COMMENT_PREFIX) &&
+          comment.user.type === "Bot"
+      );
+    } catch (error) {
+      console.error(
+        "Error when fetching existing comments: " +
+          JSON.stringify(error, null, 2)
+      );
+    }
+    return result;
   }
 
   /**

@@ -72,7 +72,13 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
 
       this.checkHasHaltingError();
 
-      await this.performGithubRequest(request);
+      try {
+        await this.performGithubRequest(request);
+      } catch (error) {
+        console.error(
+          "Error when creating check run: " + JSON.stringify(error, null, 2)
+        );
+      }
     }
   }
 
