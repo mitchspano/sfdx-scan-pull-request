@@ -132,7 +132,7 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
    */
   private async getExistingComments() {
     console.log("Getting existing comments using GitHub REST API...");
-    let result;
+    let result = Array<GithubExistingComment>();
     try {
       result = (
         await this.performGithubRequest<GithubExistingComment[]>("GET")
