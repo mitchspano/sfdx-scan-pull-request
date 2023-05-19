@@ -13,7 +13,7 @@ export function getScannerViolationType(
   violation: ScannerViolation,
   engine: string
 ): ScannerViolationType {
-  if (inputs.severityThreshold <= violation.severity) {
+  if (inputs.severityThreshold >= violation.severity) {
     return "Error";
   }
   if (!inputs.strictlyEnforcedRules) {
