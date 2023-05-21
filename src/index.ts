@@ -91,9 +91,14 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
   console.log(
     "Performing static code analysis on all of the files in the difference..."
   );
-
-  const findings = await scanFiles(scannerFlags);
-  return typeof findings === "string" ? [] : findings;
+  try {
+    const findings = await scanFiles(scannerFlags);
+    return typeof findings === "string" ? [] : findings;
+  } catch (err) {
+    console.error({ err });
+    setFailed("Something went wrong when scanning the files.");
+  }
+  return [];
 }
 
 /**
