@@ -27,7 +27,7 @@ Location of eslintrc config to customize eslint engine.
 
 ## `pmdconfig`
 
-Location of PMD rule reference XML file to customize rule selection
+Location of PMD rule reference XML file to customize rule selection.
 
 ### Multiple PMD Rulesets
 
@@ -70,7 +70,7 @@ Optionally provide this to scan a whole directory instead of just the diff. If t
 
 ## `tsconfig`
 
-Location of tsconfig.json file
+Location of tsconfig.json file.
 
 ## `report-mode`
 
@@ -81,7 +81,7 @@ Details which way to report issues back to GitHub, can be either:
 
 ## `delete-resolved-comments`
 
-When set to true, will delete resolved comments from a PR. Defaults to `false`. Will do nothing unless `report-mode` is set to `comments`
+When set to true, will delete resolved comments from a PR. Defaults to `false`. Will do nothing unless `report-mode` is set to `comments`.
 
 ## Example usage
 
