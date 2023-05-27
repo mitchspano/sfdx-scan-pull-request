@@ -95,7 +95,13 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
     const findings = await scanFiles(scannerFlags);
     return typeof findings === "string" ? [] : findings;
   } catch (err) {
-    console.error({ err });
+    if (err instanceof Error) {
+      console.error({ message: err.message });
+      console.error({ message: err.name });
+      console.error({ message: err.stack });
+    } else {
+      console.error({ err });
+    }
     setFailed("Something went wrong when scanning the files.");
   }
   return [];
