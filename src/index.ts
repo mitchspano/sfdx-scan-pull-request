@@ -31,7 +31,7 @@ import { Reporter } from "./reporter/reporter.types";
 interface ExecSyncError {
   status: string;
   stack: string;
-  output: Buffer;
+  output?: Buffer;
   message: string;
 }
 
@@ -109,7 +109,7 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
       message: typedErr.message,
       status: typedErr.status,
       stack: typedErr.stack,
-      output: typedErr.output.toString(),
+      output: typedErr.output?.toString(),
     });
     setFailed("Something went wrong when scanning the files.");
   }
@@ -215,7 +215,7 @@ async function registerCustomPmdRules(rules: string) {
         message: typedErr.message,
         status: typedErr.status,
         stack: typedErr.stack,
-        output: typedErr.output.toString(),
+        output: typedErr.output?.toString(),
       });
       setFailed("Something went wrong when registering custom rule.");
     }
