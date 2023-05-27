@@ -58,6 +58,7 @@ const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
       JSON.parse(execSync(cliCommand).toString()) as SfdxCommandResult<T>
     ).result;
   } catch (err) {
+    console.error({ err });
     throw err;
   }
   return result;
