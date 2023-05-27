@@ -234,7 +234,7 @@ async function main() {
 
   if (inputs.customPmdRules) {
     try {
-      registerCustomPmdRules(inputs.customPmdRules);
+      await registerCustomPmdRules(inputs.customPmdRules);
     } catch (err) {
       const typedErr = err as unknown as ExecSyncError;
       console.error({

@@ -58,13 +58,13 @@ pmdconfig: masterRuleset.xml
 
 ## `custom-pmd-rules`
 
-A JSON string which defines any custom rules which need to be registered before the scan is ran. Custom rules are identified by the path to their ruleset XML file and their language.
+A JSON string which defines any custom rules which need to be registered before the scan is ran. Custom rules are identified by the path to their XML/JAR file and their language.
 
 ex:
 
 ```json
 [
-  { "rulesetPath": "rulesets/customApex.xml", "language": "apex" },
+  { "rulesetPath": "rulesets/customApex.jar", "language": "apex" },
   { "rulesetPath": "rulesets/customXml.xml", "language": "xml" }
 ]
 ```
