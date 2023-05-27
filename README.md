@@ -6,6 +6,9 @@ Runs sfdx-scanner on a pull request or individual commit and generates in-line c
 
 ## Inputs
 
+| NOTE: All inputs are optional |
+| ----------------------------- |
+
 ## `category`
 
 Categor(ies) of rules to run.
@@ -25,6 +28,33 @@ Location of eslintrc config to customize eslint engine.
 ## `pmdconfig`
 
 Location of PMD rule reference XML file to customize rule selection
+
+### Multiple PMD Rulesets
+
+To use multiple rulesets within the scan, make a top level file such as `masterRuleset.xml` and include the paths to the other ruleset files:
+
+```
+.
+├── masterRuleset.xml
+├── ruleset1.xml
+└── ruleset2.xml
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="master"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>Master Ruleset</description>
+    <rule ref="ruleset1.xml" />
+    <rule ref="ruleset2.xml" />
+</ruleset>
+```
+
+```yml
+pmdconfig: masterRuleset.xml
+```
 
 ## `severity-threshold`
 
@@ -75,9 +105,9 @@ jobs:
           sfdx plugins:install @salesforce/sfdx-scanner
 
       - name: Run SFDX Scanner - Report findings as comments
-        uses: mitchspano/sfdx-scan-pull-request@v0.1.11
+        uses: mitchspano/sfdx-scan-pull-request@v0.1.12
         with:
-          pmdconfig: ruleset.xml
+          pmdconfig: masterRuleset.xml
           severity-threshold: 4
           strictly-enforced-rules: '[{ "engine": "pmd", "category": "Performance", "rule": "AvoidDebugStatements" }]'
         env:
