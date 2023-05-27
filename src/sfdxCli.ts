@@ -82,5 +82,6 @@ export async function registerRule(path: string, language: string) {
   return cli<ScannerFinding[] | string>("scanner:rule:add", [
     `--path="${path}"`,
     `--language="${language}"`,
+    "--json",
   ]);
 }
