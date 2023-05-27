@@ -97,8 +97,9 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
   } catch (err) {
     if (err instanceof Error) {
       console.error({ message: err.message });
-      console.error({ message: err.name });
-      console.error({ message: err.stack });
+      console.error({ name: err.name });
+      console.error({ stack: err.stack });
+      console.error("Full error: " + JSON.stringify(err, null, 2));
     } else {
       console.error({ err });
     }
