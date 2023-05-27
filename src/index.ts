@@ -207,7 +207,18 @@ async function registerCustomPmdRules(rules: string) {
   for (let rule of JSON.parse(rules) as {
     [key in string]: string;
   }[]) {
-    await registerRule(rule.rulesetPath, rule.language);
+    try {
+      await registerRule(rule.rulesetPath, rule.language);
+    } catch (err) {
+      const typedErr = err as unknown as ExecSyncError;
+      console.error({
+        message: typedErr.message,
+        status: typedErr.status,
+        stack: typedErr.stack,
+        output: typedErr.output.toString(),
+      });
+      setFailed("Something went wrong when registering custom rule.");
+    }
   }
 }
 
@@ -233,18 +244,7 @@ async function main() {
   scannerFlags.target = filesToScan.join(",");
 
   if (inputs.customPmdRules) {
-    try {
-      await registerCustomPmdRules(inputs.customPmdRules);
-    } catch (err) {
-      const typedErr = err as unknown as ExecSyncError;
-      console.error({
-        message: typedErr.message,
-        status: typedErr.status,
-        stack: typedErr.stack,
-        output: typedErr.output.toString(),
-      });
-      setFailed("Something went wrong when registering custom rules.");
-    }
+    registerCustomPmdRules(inputs.customPmdRules);
   }
 
   const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
