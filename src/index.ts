@@ -27,6 +27,13 @@ import { CommentsReporter } from "./reporter/comments-reporter";
 import { AnnotationsReporter } from "./reporter/annoations-reporter";
 import { Reporter } from "./reporter/reporter.types";
 
+interface ExecSyncError {
+  status: string;
+  stack: string;
+  output: Buffer;
+  message: string;
+}
+
 /**
  * @description Collects and verifies the inputs from the action context and metadata
  * https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#inputs
@@ -95,14 +102,13 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
     const findings = await scanFiles(scannerFlags);
     return typeof findings === "string" ? [] : findings;
   } catch (err) {
-    if (err instanceof Error) {
-      console.error({ message: err.message });
-      console.error({ name: err.name });
-      console.error({ stack: err.stack });
-      console.error("Full error: " + JSON.stringify(err, null, 2));
-    } else {
-      console.error({ err });
-    }
+    const typedErr = err as unknown as ExecSyncError;
+    console.error({
+      message: typedErr.message,
+      status: typedErr.status,
+      stack: typedErr.stack,
+      output: typedErr.output.toString(),
+    });
     setFailed("Something went wrong when scanning the files.");
   }
   return [];
