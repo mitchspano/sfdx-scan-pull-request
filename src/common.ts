@@ -3,6 +3,7 @@ import { ScannerViolation, ScannerViolationType } from "./sfdxCli";
 export type PluginInputs = {
   severityThreshold: number;
   strictlyEnforcedRules: string;
+  customPmdRules?: string;
   deleteResolvedComments: boolean;
   reportMode: string | "comments" | "check-runs";
   target: string;

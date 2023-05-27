@@ -56,13 +56,32 @@ To use multiple rulesets within the scan, make a top level file such as `masterR
 pmdconfig: masterRuleset.xml
 ```
 
+## `custom-pmd-rules`
+
+A JSON string which defines any custom rules which need to be registered before the scan is ran. Custom rules are identified by the path to their ruleset XML file and their language.
+
+ex:
+
+```json
+[
+  { "rulesetPath": "rulesets/customApex.xml", "language": "apex" },
+  { "rulesetPath": "rulesets/customXml.xml", "language": "xml" }
+]
+```
+
 ## `severity-threshold`
 
 Throws an error when violations of specific severity (or more severe) are detected.
 
 ## `strictly-enforced-rules`
 
-A JSON string which contains the rules which will be strictly enforced regardless of their priority. Enforced rules are identified by their engine, category, and rule name.
+A JSON string which defines the rules which will be strictly enforced regardless of their priority. Enforced rules are identified by their engine, category, and rule name.
+
+ex:
+
+```json
+[{ "engine": "pmd", "category": "Performance", "rule": "AvoidDebugStatements" }]
+```
 
 ## `target`
 
