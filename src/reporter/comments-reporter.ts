@@ -236,15 +236,15 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
     commit_id: string
   ): string {
     const commentHeader = `${HIDDEN_COMMENT_PREFIX}
-    | Attribute | Value |
-    | --- | --- |`;
+| Attribute | Value |
+| --- | --- |`;
     return `${commentHeader}
-    | Engine | ${engine} |
-    | Category | ${violation.category} |
-    | Rule | ${violation.ruleName} |
-    | Severity | ${violation.severity} |
-    | Type | ${violationType} |
-    | Message| [${violation.message.trim()}](${violation.url}) |
-    | File | [${filePath}](${getGithubFilePath(commit_id, filePath)}) |`;
+| Engine | ${engine}|
+| Category | ${violation.category} |
+| Rule | ${violation.ruleName} |
+| Severity | ${violation.severity} |
+| Type | ${violationType} |
+| Message| [${violation.message.trim()}](${violation.url}) |
+| File | [${filePath}](${getGithubFilePath(commit_id, filePath)}) |`;
   }
 }
