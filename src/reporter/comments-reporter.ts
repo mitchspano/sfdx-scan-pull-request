@@ -202,9 +202,6 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
       ? this.context.payload.pull_request.head.sha
       : this.context.sha;
 
-    const commentHeader = `${HIDDEN_COMMENT_PREFIX}
-  | Engine | Category | Rule | Severity | Type | Message | File |
-  | --- | --- | --- | --- | --- | --- | --- |`;
     this.issues.push({
       commit_id,
       path: filePath,
@@ -212,13 +209,42 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
       start_side: "RIGHT",
       side: "RIGHT",
       line: endLine,
-      body: `${commentHeader}
-| ${engine} | ${violation.category} | ${violation.ruleName} | ${
-        violation.severity
-      } | ${violationType} | [${violation.message.trim()}](${
-        violation.url
-      }) | [${filePath}](${getGithubFilePath(commit_id, filePath)}) |`,
+      body: this.getFormattedBody(
+        engine,
+        violationType,
+        violation,
+        filePath,
+        commit_id
+      ),
     });
     return { violationType };
+  }
+
+  /**
+   * @description Formats the body of a review comment as a table
+   * @param engine - reporting engine responsible for identifying the violation
+   * @param violationType - error or warning depending on threshold and strictly enforced rules
+   * @param violation - raw violation from the scan
+   * @param filePath - path to the file
+   * @param commit_id - Id of the commit to generate a link to the file
+   */
+  getFormattedBody(
+    engine: string,
+    violationType: string,
+    violation: ScannerViolation,
+    filePath: string,
+    commit_id: string
+  ): string {
+    const commentHeader = `${HIDDEN_COMMENT_PREFIX}
+    | Attribute | Value |
+    | --- | --- |`;
+    return `${commentHeader}
+    | Engine | ${engine} |
+    | Category | ${violation.category} |
+    | Rule | ${violation.ruleName} |
+    | Severity | ${violation.severity} |
+    | Type | ${violationType} |
+    | Message| [${violation.message.trim()}](${violation.url}) |
+    | File | [${filePath}](${getGithubFilePath(commit_id, filePath)}) |`;
   }
 }
