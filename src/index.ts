@@ -208,7 +208,7 @@ async function registerCustomPmdRules(rules: string) {
     [key in string]: string;
   }[]) {
     try {
-      await registerRule(rule.rulesetPath, rule.language);
+      await registerRule(rule.path, rule.language);
     } catch (err) {
       const typedErr = err as unknown as ExecSyncError;
       console.error({

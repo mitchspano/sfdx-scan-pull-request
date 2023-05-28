@@ -64,8 +64,8 @@ ex:
 
 ```json
 [
-  { "rulesetPath": "rulesets/customApex.jar", "language": "apex" },
-  { "rulesetPath": "rulesets/customXml.xml", "language": "xml" }
+  { "path": "customRules/customApex.jar", "language": "apex" },
+  { "path": "customRules/customXml.xml", "language": "xml" }
 ]
 ```
 
