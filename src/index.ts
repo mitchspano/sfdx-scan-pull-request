@@ -18,6 +18,7 @@ import { getDiffInPullRequest, GithubPullRequest } from "./git-actions";
 
 import {
   scanFiles,
+  registerRule,
   ScannerFinding,
   ScannerFlags,
   ScannerViolation,
@@ -30,7 +31,7 @@ import { Reporter } from "./reporter/reporter.types";
 interface ExecSyncError {
   status: string;
   stack: string;
-  output: Buffer;
+  output?: Buffer;
   message: string;
 }
 
@@ -52,6 +53,7 @@ function initialSetup() {
   // where: 1 (high), 2 (moderate), and 3 (low)
   const inputs: PluginInputs = {
     reportMode: getInput("report-mode") || "check-runs",
+    customPmdRules: getInput("custom-pmd-rules"),
     severityThreshold: parseInt(getInput("severity-threshold")) || 4,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
     deleteResolvedComments: getInput("delete-resolved-comments") === "true",
@@ -107,7 +109,7 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
       message: typedErr.message,
       status: typedErr.status,
       stack: typedErr.stack,
-      output: typedErr.output.toString(),
+      output: typedErr.output?.toString(),
     });
     setFailed("Something went wrong when scanning the files.");
   }
@@ -199,6 +201,28 @@ function getFilesToScan(
 }
 
 /**
+ * @description Calls `scanner:rule:add` for every custom rule defined as input
+ */
+async function registerCustomPmdRules(rules: string) {
+  for (let rule of JSON.parse(rules) as {
+    [key in string]: string;
+  }[]) {
+    try {
+      await registerRule(rule.path, rule.language);
+    } catch (err) {
+      const typedErr = err as unknown as ExecSyncError;
+      console.error({
+        message: typedErr.message,
+        status: typedErr.status,
+        stack: typedErr.stack,
+        output: typedErr.output?.toString(),
+      });
+      setFailed("Something went wrong when registering custom rule.");
+    }
+  }
+}
+
+/**
  * @description Main method - injection point for code execution
  */
 async function main() {
@@ -212,17 +236,16 @@ async function main() {
     pullRequest?.base?.repo?.clone_url
   );
 
-  if (!inputs.target) {
-    console.log("Here are the lines which have changed:");
-    console.log({ filePathToChangedLines });
-  }
-
   const filesToScan = getFilesToScan(filePathToChangedLines, inputs.target);
   if (filesToScan.length === 0) {
     console.log("There are no files to scan - exiting now.");
     return;
   }
   scannerFlags.target = filesToScan.join(",");
+
+  if (inputs.customPmdRules) {
+    registerCustomPmdRules(inputs.customPmdRules);
+  }
 
   const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
     scannerFlags
