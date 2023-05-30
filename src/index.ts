@@ -54,7 +54,7 @@ function initialSetup() {
   const inputs: PluginInputs = {
     reportMode: getInput("report-mode") || "check-runs",
     customPmdRules: getInput("custom-pmd-rules"),
-    severityThreshold: parseInt(getInput("severity-threshold")) || 4,
+    severityThreshold: parseInt(getInput("severity-threshold")) || 0,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
     deleteResolvedComments: getInput("delete-resolved-comments") === "true",
     target: context?.payload?.pull_request ? "" : getInput("target"),
@@ -138,6 +138,8 @@ function filterFindingsToDiffScope(
     const relevantLines =
       filePathToChangedLines.get(filePath) || new Set<number>();
     for (let violation of finding.violations) {
+      console.log({ violation });
+
       if (!isInChangedLines(violation, relevantLines) && !inputs.target) {
         continue;
       }
@@ -147,6 +149,7 @@ function filterFindingsToDiffScope(
         violation,
         finding.engine
       );
+      console.log({ violationType });
       if (violationType === "Error") {
         hasHaltingError = true;
       }
