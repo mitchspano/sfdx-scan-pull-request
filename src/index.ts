@@ -54,7 +54,7 @@ function initialSetup() {
   const inputs: PluginInputs = {
     reportMode: getInput("report-mode") || "check-runs",
     customPmdRules: getInput("custom-pmd-rules"),
-    severityThreshold: parseInt(getInput("severity-threshold")) || 4,
+    severityThreshold: parseInt(getInput("severity-threshold")) || 0,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
     deleteResolvedComments: getInput("delete-resolved-comments") === "true",
     target: context?.payload?.pull_request ? "" : getInput("target"),
@@ -131,7 +131,6 @@ function filterFindingsToDiffScope(
   console.log(
     "Filtering the findings to just the lines which are part of the pull request..."
   );
-  let hasHaltingError = false;
 
   for (let finding of findings) {
     const filePath = finding.fileName.replace(process.cwd() + "/", "");
@@ -141,18 +140,9 @@ function filterFindingsToDiffScope(
       if (!isInChangedLines(violation, relevantLines) && !inputs.target) {
         continue;
       }
-
-      const { violationType } = reporter.translateViolationToReport(
-        filePath,
-        violation,
-        finding.engine
-      );
-      if (violationType === "Error") {
-        hasHaltingError = true;
-      }
+      reporter.translateViolationToReport(filePath, violation, finding.engine);
     }
   }
-  return { hasHaltingError };
 }
 
 /**

@@ -118,6 +118,5 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
       message: `${violation.category} ${violation.message}\n${violation.url}`,
       title: `${violation.ruleName} (sev: ${violation.severity})`,
     });
-    return { violationType };
   }
 }
