@@ -131,31 +131,18 @@ function filterFindingsToDiffScope(
   console.log(
     "Filtering the findings to just the lines which are part of the pull request..."
   );
-  let hasHaltingError = false;
 
   for (let finding of findings) {
     const filePath = finding.fileName.replace(process.cwd() + "/", "");
     const relevantLines =
       filePathToChangedLines.get(filePath) || new Set<number>();
     for (let violation of finding.violations) {
-      console.log({ violation });
-
       if (!isInChangedLines(violation, relevantLines) && !inputs.target) {
         continue;
       }
-
-      const { violationType } = reporter.translateViolationToReport(
-        filePath,
-        violation,
-        finding.engine
-      );
-      console.log({ violationType });
-      if (violationType === "Error") {
-        hasHaltingError = true;
-      }
+      reporter.translateViolationToReport(filePath, violation, finding.engine);
     }
   }
-  return { hasHaltingError };
 }
 
 /**

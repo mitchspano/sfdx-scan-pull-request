@@ -22,6 +22,8 @@ import {
 } from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
 
+const ERROR = "Error";
+
 const HIDDEN_COMMENT_PREFIX = "<!--sfdx-scanner-->";
 
 export class CommentsReporter extends BaseReporter<GithubComment> {
@@ -198,6 +200,9 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
       violation,
       engine
     );
+    if (violationType === ERROR) {
+      this.hasHaltingError = true;
+    }
     const commit_id = this.context.payload.pull_request
       ? this.context.payload.pull_request.head.sha
       : this.context.sha;
@@ -217,7 +222,6 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
         commit_id
       ),
     });
-    return { violationType };
   }
 
   /**

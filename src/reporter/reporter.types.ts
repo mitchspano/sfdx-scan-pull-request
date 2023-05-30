@@ -74,7 +74,7 @@ export interface Reporter {
     filePath: string,
     violation: ScannerViolation,
     engine: string
-  ): { violationType: string };
+  ): void;
 }
 
 type GithubCommentSide = "RIGHT";
@@ -98,7 +98,7 @@ export abstract class BaseReporter<T> implements Reporter {
     _filePath: string,
     _violation: ScannerViolation,
     _engine: string
-  ): { violationType: string } {
+  ): void {
     throw new Error("Method not implemented.");
   }
 
