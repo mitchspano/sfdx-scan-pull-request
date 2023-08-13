@@ -218,6 +218,7 @@ async function registerCustomPmdRules(rules: string) {
 async function main() {
   console.log("Beginning sfdx-scan-pull-request run...");
   const { pullRequest, scannerFlags, reporter, inputs } = initialSetup();
+  console.log({ target: inputs.target });
   validateContext(pullRequest, inputs.target);
   let filePathToChangedLines = inputs.target
     ? new Map<string, Set<number>>()
