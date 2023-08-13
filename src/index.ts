@@ -98,7 +98,7 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
   scannerFlags: ScannerFlags
 ) {
   console.log(
-    "Performing static code analysis on all of the files in the difference..."
+    "Performing static code analysis on all of the relevant files..."
   );
   try {
     const findings = await scanFiles(scannerFlags);
@@ -129,7 +129,7 @@ function filterFindingsToDiffScope(
   reporter: Reporter
 ) {
   console.log(
-    "Filtering the findings to just the lines which are part of the pull request..."
+    "Filtering the findings to just the lines which are part of the context..."
   );
 
   for (let finding of findings) {
@@ -218,7 +218,6 @@ async function registerCustomPmdRules(rules: string) {
 async function main() {
   console.log("Beginning sfdx-scan-pull-request run...");
   const { pullRequest, scannerFlags, reporter, inputs } = initialSetup();
-  console.log({ target: inputs.target });
   validateContext(pullRequest, inputs.target);
   let filePathToChangedLines = inputs.target
     ? new Map<string, Set<number>>()
