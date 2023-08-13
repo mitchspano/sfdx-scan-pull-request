@@ -219,12 +219,13 @@ async function main() {
   console.log("Beginning sfdx-scan-pull-request run...");
   const { pullRequest, scannerFlags, reporter, inputs } = initialSetup();
   validateContext(pullRequest, inputs.target);
-
-  const filePathToChangedLines = await getDiffInPullRequest(
-    pullRequest?.base?.ref,
-    pullRequest?.head?.ref,
-    pullRequest?.base?.repo?.clone_url
-  );
+  let filePathToChangedLines = inputs.target
+    ? new Map<string, Set<number>>()
+    : await getDiffInPullRequest(
+        pullRequest?.base?.ref,
+        pullRequest?.head?.ref,
+        pullRequest?.base?.repo?.clone_url
+      );
 
   const filesToScan = getFilesToScan(filePathToChangedLines, inputs.target);
   if (filesToScan.length === 0) {
