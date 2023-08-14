@@ -124,7 +124,7 @@ jobs:
           sfdx plugins:install @salesforce/sfdx-scanner
 
       - name: Run SFDX Scanner - Report findings as comments
-        uses: mitchspano/sfdx-scan-pull-request@v0.1.12
+        uses: mitchspano/sfdx-scan-pull-request@v[LATEST_VERSION_HERE]
         with:
           pmdconfig: masterRuleset.xml
           severity-threshold: 4
