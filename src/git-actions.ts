@@ -42,7 +42,7 @@ export async function getDiffInPullRequest(
    * called from within action. Writing to file, then reading avoids this error.
    */
   execSync(
-    `git diff destination/${baseRef}..."origin/${headRef}" > ${DIFF_OUTPUT}`
+    `git diff "destination/${baseRef}"..."origin/${headRef}" > ${DIFF_OUTPUT}`
   );
   const files = parse(fs.readFileSync(DIFF_OUTPUT).toString());
   const filePathToChangedLines = new Map<string, Set<number>>();
