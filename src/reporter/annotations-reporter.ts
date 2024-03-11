@@ -32,8 +32,8 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
    */
   private performGithubRequest<T>(body: GithubCheckRun) {
     const octokit = new Octokit();
-    const owner = context.repo.owner;
-    const repo = context.repo.repo;
+    const owner = context?.payload?.repository?.owner?.login || context.repo.owner;
+    const repo = context?.payload?.repository?.name || context.repo.repo;
 
     const endpoint = `POST /repos/${owner}/${repo}/check-runs`;
 
@@ -55,9 +55,10 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
 
     const commit_id = this.context.payload?.pull_request
       ? this.context.payload.pull_request.head.sha
-      : this.context.sha;
+      : this.inputs.headSha || this.context.sha;
 
     if (this.issues) {
+      console.log(`${this.issues.length} violations found`);
       const request: GithubCheckRun = {
         name: "sfdx-scanner",
         head_sha: commit_id,

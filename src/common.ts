@@ -6,6 +6,9 @@ export type PluginInputs = {
   customPmdRules?: string;
   deleteResolvedComments: boolean;
   reportMode: string | "comments" | "check-runs";
+  base: string;
+  head: string;
+  headSha: string;
   target: string;
 };
 

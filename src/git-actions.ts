@@ -18,7 +18,7 @@ import { execSync } from "child_process";
 
 const DIFF_OUTPUT = "diffBetweenCurrentAndParentBranch.txt";
 
-export type GithubPullRequest = typeof context.payload.pull_request | undefined;
+export type GithubPullRequest = typeof context.payload.pull_request | undefined
 
 /**
  * @description Calculates the diff for all files within the pull request and
