@@ -15,7 +15,11 @@ Categor(ies) of rules to run.
 
 ## `engine`
 
-Engine(s) to run.
+Engine(s) to run. This takes the form of a comma delimited string, and is passed directly to the sf scanner command line. ie:
+
+```
+'pmd,eslint,eslint-lwc'
+```
 
 ## `eslint-env`
 
