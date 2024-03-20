@@ -87,6 +87,18 @@ ex:
 [{ "engine": "pmd", "category": "Performance", "rule": "AvoidDebugStatements" }]
 ```
 
+## `base`
+
+Base to use for diff when `target` is not set and the action is run outside the context of a pull request event.
+
+## `head`
+
+Head to use for diff when `target` is not set and the action is run outside the context of a pull request event.
+
+## `head-sha`
+
+Commit hash of head to use for diff when `target` is not set and the action is run outside the context of a pull request event.
+
 ## `target`
 
 Optionally provide this to scan a whole directory instead of just the diff. If the action is run on a push, `target` will be respected; because GitHub does not allow the uploading of comments during a PR run for a file that hasn't been changed on the latest commit for that PR, this option is ignored when running for a pull request (in favor of just scanning the diff, as it would if this option wasn't supplied).

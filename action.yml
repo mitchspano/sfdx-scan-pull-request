@@ -1,6 +1,8 @@
 name: "SFDX Scan Pull Request"
 description: "Executes SFDX Scanner on the scope of a pull request, translates the findings into in-line comments."
 inputs:
+  base:
+    description: "Base reference"
   category:
     description: "Categor(ies) of rules to run."
   engine:
@@ -9,6 +11,10 @@ inputs:
     description: "JSON-formatted string, overrides ESLint's default environment variables."
   eslintconfig:
     description: "Location of eslintrc config to customize eslint engine."
+  head:
+    description: "Head reference. Overrides PR context and target, if set."
+  head-sha:
+    description: "Commit hash for Head reference."
   pmdconfig:
     description: "Location of PMD rule reference XML file to customize rule selection."
   custom-pmd-rules:

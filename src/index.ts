@@ -25,7 +25,7 @@ import {
 } from "./sfdxCli";
 import { PluginInputs } from "./common";
 import { CommentsReporter } from "./reporter/comments-reporter";
-import { AnnotationsReporter } from "./reporter/annoations-reporter";
+import { AnnotationsReporter } from "./reporter/annotations-reporter";
 import { Reporter } from "./reporter/reporter.types";
 
 interface ExecSyncError {
@@ -57,7 +57,10 @@ function initialSetup() {
     severityThreshold: parseInt(getInput("severity-threshold")) || 0,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
     deleteResolvedComments: getInput("delete-resolved-comments") === "true",
-    target: context?.payload?.pull_request ? "" : getInput("target"),
+    base: getInput("base"),
+    head: getInput("head"),
+    headSha: getInput("head-sha"),
+    target: ((getInput("base") && getInput("head")) || context?.payload?.pull_request) ? "" : getInput("target"),
   };
 
   const reporterParams = {
@@ -79,11 +82,11 @@ function initialSetup() {
 /**
  * @description Validate that the action is called correctly
  */
-function validateContext(pullRequest: GithubPullRequest, target: string) {
+function validateContext(pullRequest: GithubPullRequest, base: string, head: string, target: string) {
   console.log(
     "Validating that this action was invoked from an acceptable context..."
   );
-  if (!pullRequest && !target) {
+  if (!pullRequest && !base && !head && !target) {
     setFailed(
       "This action is only applicable when invoked by a pull request, or with the target property supplied."
     );
@@ -218,13 +221,13 @@ async function registerCustomPmdRules(rules: string) {
 async function main() {
   console.log("Beginning sfdx-scan-pull-request run...");
   const { pullRequest, scannerFlags, reporter, inputs } = initialSetup();
-  validateContext(pullRequest, inputs.target);
+  validateContext(pullRequest, inputs.base, inputs.head, inputs.target);
   let filePathToChangedLines = inputs.target
     ? new Map<string, Set<number>>()
     : await getDiffInPullRequest(
-        pullRequest?.base?.ref,
-        pullRequest?.head?.ref,
-        pullRequest?.base?.repo?.clone_url
+        inputs.base || pullRequest?.base?.ref,
+        inputs.head || pullRequest?.head?.ref,
+        context?.payload?.repository?.clone_url
       );
 
   const filesToScan = getFilesToScan(filePathToChangedLines, inputs.target);

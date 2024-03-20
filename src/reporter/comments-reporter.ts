@@ -38,12 +38,13 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
     optionalBody?: GithubComment
   ) {
     const octokit = new Octokit();
-    const owner = context.repo.owner;
-    const repo = context.repo.repo;
+    const owner = context?.payload?.repository?.owner?.login || context.repo.owner;
+    const repo = context?.payload?.repository?.name || context.repo.repo;
     const prNumber = context.payload.pull_request?.number;
+    const sha = this.inputs.headSha || context.sha;
 
     const endpoint = `${method} /repos/${owner}/${repo}/${
-      prNumber ? `pulls/${prNumber}` : `commits/${context.sha}`
+      prNumber ? `pulls/${prNumber}` : `commits/${sha}`
     }/comments`;
 
     return (
@@ -60,8 +61,8 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
    */
   private async performGithubDeleteRequest(comment: GithubExistingComment) {
     const octokit = new Octokit();
-    const owner = context.repo.owner;
-    const repo = context.repo.repo;
+    const owner = context?.payload?.repository?.owner?.login || context.repo.owner;
+    const repo = context?.payload?.repository?.name || context.repo.repo;
     const endpoint = `DELETE /repos/${owner}/${repo}/pulls/comments/${comment.id}`;
     await octokit.request(endpoint);
   }
@@ -73,6 +74,8 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
   async write() {
     console.log("Writing comments using GitHub REST API...");
     const existingComments = await this.getExistingComments();
+
+    console.log(`${this.issues.length} violations found`);
 
     for (let comment of this.issues) {
       const existingComment = existingComments.find((existingComment) =>
@@ -205,7 +208,7 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
     }
     const commit_id = this.context.payload.pull_request
       ? this.context.payload.pull_request.head.sha
-      : this.context.sha;
+      : this.inputs.headSha || this.context.sha;
 
     this.issues.push({
       commit_id,
