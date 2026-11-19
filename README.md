@@ -19,20 +19,27 @@ rule-selector: "pmd:Security eslint:Recommended"
 
 ## `config-file`
 
-Path to a [`code-analyzer.yml`](https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/config-custom.html) file. If omitted, `./code-analyzer.yml` is used when present. Custom rules must also be picked by `rule-selector` (by rule name, `pmd`, or a tag they declare). Use this file for what used to be `pmdconfig`, `custom-pmd-rules`, `eslintconfig`, and `tsconfig`, ie:
+Path to a [`code-analyzer.yml`](https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/config-custom.html) file. If omitted, `./code-analyzer.yml` is used when present. Use this file for what used to be `pmdconfig`, `custom-pmd-rules`, `eslintconfig`, and `tsconfig`, ie:
 
 ```yml
 engines:
   pmd:
-    custom_rulesets: # custom PMD rules (replaces `custom-pmd-rules`)
+    java_classpath_entries: # JARs containing custom Java rules
+      - target/pmd-rules-1.0.0.jar
+    custom_rulesets: # ruleset XML files on disk, or paths inside a JAR above
       - rulesets/myRuleset.xml
+      - category/apex/my-rules.xml
   eslint:
     eslint_config_file: .eslintrc.json
 ```
 
+Custom rules are tagged `Recommended` and `Custom`, so the default `rule-selector` includes them. To change a rule's severity or tags, use the `rules` section of the config file.
+
+> **PMD 7:** Code Analyzer v5 runs PMD 7. Custom Java rules compiled against PMD 6 fail to load (e.g. `NoSuchMethodError: ...findDescendantsOfType`) and must be ported and rebuilt. See the [PMD 7 migration guide](https://docs.pmd-code.org/latest/pmd_userdocs_migrating_to_pmd7.html). XPath rules mostly work as-is. If an engine fails to load, the action fails rather than reporting partial results.
+
 ## `severity-threshold`
 
-Throws an error when violations of specific severity (or more severe) are detected. Severities range from 1 (Critical) to 5 (Info).
+Fails the action when violations of this severity (or more severe) are found on changed lines. Severities range from 1 (Critical) to 5 (Info). If not set, only `strictly-enforced-rules` fail the action.
 
 ## `strictly-enforced-rules`
 
@@ -61,6 +68,8 @@ When set to true, will delete resolved comments from a PR. Defaults to `false`. 
 
 ## Example usage
 
+The workflow token needs `pull-requests: write` for `comments` mode, or `checks: write` for `check-runs` mode. `fetch-depth: 0` is required so the action can compute the PR diff.
+
 ```
 name: Static Analysis
 on:
@@ -70,6 +79,10 @@ on:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -83,7 +96,7 @@ jobs:
       - name: Run Code Analyzer - Report findings as comments
         uses: mitchspano/sfdx-scan-pull-request@v[LATEST_VERSION_HERE]
         with:
-          rule-selector: "Recommended"
+          report-mode: comments
           severity-threshold: 2
           strictly-enforced-rules: '[{ "engine": "pmd", "rule": "AvoidDebugStatements" }]'
         env:
@@ -92,16 +105,31 @@ jobs:
 
 Code Analyzer requires Java 11+ (PMD) and Python 3.10+ (Flow engine); both are preinstalled on `ubuntu-latest`.
 
+## Migrating from v0.1.x
+
+v0.2.0 replaces the retired `@salesforce/sfdx-scanner` plugin with Code Analyzer v5.
+
+| v0.1.x | v0.2.x |
+| --- | --- |
+| `npm install sfdx-cli -g` + `sfdx plugins:install @salesforce/sfdx-scanner` | `npm install @salesforce/cli -g` + `sf plugins install code-analyzer` |
+| `engine`, `category` | `rule-selector` (e.g. `pmd:Security`) |
+| `pmdconfig`, `custom-pmd-rules` | `custom_rulesets` / `java_classpath_entries` in `code-analyzer.yml` |
+| `eslintconfig`, `eslint-env`, `tsconfig` | `engines.eslint` in `code-analyzer.yml` |
+| severities 1–3 | severities 1–5; review your `severity-threshold` |
+| `strictly-enforced-rules` with `engine`/`category`/`rule` | `engine`/`rule` (`category` ignored) |
+| PMD 6 custom Java rules | rebuild against PMD 7 (see above) |
+
 ### Included Dependencies
 
 This package includes the following version of the required dependencies:
 
 | npm package     | included version |
 | --------------- | ---------------- |
-| @actions/core   | 1.9.0            |
-| @actions/github | 5.0.3            |
+| @actions/core   | 1.10.0           |
+| @actions/github | 5.1.1            |
 | @octokit/action | 4.0.4            |
 | parse-diff      | 0.9.0            |
+| simple-git      | 3.17.0           |
 
 
 ### Making Modifications
