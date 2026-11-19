@@ -30,6 +30,32 @@ export function getScannerViolationType(
     : "Warning";
 }
 
+export type LineRange = { start: number; end: number };
+
+/**
+ * @description Finds where in the diff to anchor a violation. Returns the first
+ * run of consecutive changed lines inside the violation's range, or undefined
+ * when none of its lines changed. Consecutive changed lines are always in the
+ * same diff hunk, so a review comment on them is accepted by GitHub.
+ */
+export function getChangedLineAnchor(
+  violation: ScannerViolation,
+  changedLines: Set<number>,
+): LineRange | undefined {
+  const start = parseInt(violation.line);
+  const end = violation.endLine ? parseInt(violation.endLine) : start;
+  for (let line = start; line <= end; line++) {
+    if (changedLines.has(line)) {
+      let anchorEnd = line;
+      while (anchorEnd < end && changedLines.has(anchorEnd + 1)) {
+        anchorEnd++;
+      }
+      return { start: line, end: anchorEnd };
+    }
+  }
+  return undefined;
+}
+
 export function getGithubFilePath(commitId: string, filePath: string) {
   return ["..", "tree", commitId, filePath].join("/");
 }

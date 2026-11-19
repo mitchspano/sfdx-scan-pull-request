@@ -11,7 +11,11 @@
    limitations under the License.
  */
 
-import { getGithubFilePath, getScannerViolationType } from "../common";
+import {
+  getGithubFilePath,
+  getScannerViolationType,
+  LineRange,
+} from "../common";
 
 import { Octokit } from "@octokit/action";
 import { context } from "@actions/github";
@@ -185,14 +189,21 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
   translateViolationToReport(
     filePath: string,
     violation: ScannerViolation,
-    engine: string
+    engine: string,
+    anchor?: LineRange
   ) {
-    const startLine = parseInt(violation.line);
-    let endLine = violation.endLine
-      ? parseInt(violation.endLine)
-      : parseInt(violation.line);
-    if (endLine === startLine) {
-      endLine++;
+    let startLine: number;
+    let endLine: number;
+    if (anchor) {
+      // On a diff, comment only on changed lines: GitHub rejects lines outside the diff
+      startLine = anchor.start;
+      endLine = anchor.end;
+    } else {
+      startLine = parseInt(violation.line);
+      endLine = violation.endLine ? parseInt(violation.endLine) : startLine;
+      if (endLine === startLine) {
+        endLine++;
+      }
     }
 
     const violationType = getScannerViolationType(
@@ -210,8 +221,10 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
     this.issues.push({
       commit_id,
       path: filePath,
-      start_line: startLine,
-      start_side: "RIGHT",
+      // GitHub requires start_line < line, so a single-line comment omits it
+      ...(startLine < endLine
+        ? { start_line: startLine, start_side: "RIGHT" as const }
+        : {}),
       side: "RIGHT",
       line: endLine,
       body: this.getFormattedBody(

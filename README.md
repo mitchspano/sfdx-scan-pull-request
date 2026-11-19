@@ -4,6 +4,8 @@ Runs [Salesforce Code Analyzer](https://developer.salesforce.com/docs/platform/s
 
 ![Example](images/sfdx-scan-pull-request.png)
 
+On a pull request, only files changed in the PR are scanned, and a violation is reported when **any** of its lines were added or modified in the PR. In `comments` mode, the comment is placed on the changed lines within the violation. In `check-runs` mode, the annotation covers the violation's full range.
+
 ## Inputs
 
 | NOTE: All inputs are optional |
