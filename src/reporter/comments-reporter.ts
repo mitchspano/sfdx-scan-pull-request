@@ -248,7 +248,7 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
 | Rule | ${violation.ruleName} |
 | Severity | ${violation.severity} |
 | Type | ${violationType} |
-| Message| [${violation.message.trim()}](${violation.url}) |
+| Message| ${violation.url ? `[${violation.message.trim()}](${violation.url})` : violation.message.trim()} |
 | File | [${filePath}](${getGithubFilePath(commit_id, filePath)}) |`;
   }
 }
