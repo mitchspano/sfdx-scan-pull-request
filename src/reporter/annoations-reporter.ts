@@ -26,6 +26,27 @@ export const RIGHT = "RIGHT";
 // GitHub accepts at most 50 annotations per check-run request
 const MAX_ANNOTATIONS_PER_REQUEST = 50;
 
+/**
+ * @description A check run created moments ago can briefly 404 on update,
+ * so retry a few times with a growing delay before giving up.
+ */
+export async function retryOnNotFound<T>(
+  request: () => Promise<T>,
+  attempts = 5,
+  delayMs = 1000
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await request();
+    } catch (error) {
+      if ((error as { status?: number }).status !== 404 || attempt >= attempts) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+    }
+  }
+}
+
 export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
   /**
    * @description Executes the REST request to submit the Check Run to GitHub
@@ -54,16 +75,21 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
       i < annotations.length;
       i += MAX_ANNOTATIONS_PER_REQUEST
     ) {
-      await octokit.request(
-        `PATCH /repos/${owner}/${repo}/check-runs/${data.id}`,
-        {
-          output: {
-            title: body.output.title,
-            summary: body.output.summary,
-            annotations: annotations.slice(i, i + MAX_ANNOTATIONS_PER_REQUEST),
-          },
-        }
-      );
+      const update = () =>
+        octokit.request(
+          `PATCH /repos/${owner}/${repo}/check-runs/${data.id}`,
+          {
+            output: {
+              title: body.output.title,
+              summary: body.output.summary,
+              annotations: annotations.slice(
+                i,
+                i + MAX_ANNOTATIONS_PER_REQUEST
+              ),
+            },
+          }
+        );
+      await retryOnNotFound(update);
     }
   }
 
