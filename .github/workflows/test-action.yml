@@ -24,7 +24,7 @@ jobs:
       - name: Apex static analysis
         uses: ./
         with:
-          rule-selector: pmd
+          rule-selector: pmd:Apex
           severity-threshold: 4
           target: tests
         env:
