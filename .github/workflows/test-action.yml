@@ -9,12 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Install SFDX CLI and Scanner
+      - name: Install Salesforce CLI and Code Analyzer
         run: |
-          npm install sfdx-cli -g
-          sfdx plugins:install @salesforce/sfdx-scanner
+          npm install @salesforce/cli -g
+          sf plugins install code-analyzer
 
       - name: Run Unit Tests
         run: |
@@ -24,10 +24,8 @@ jobs:
       - name: Apex static analysis
         uses: ./
         with:
-          pmdconfig: .github/workflows/pmd-ruleset.xml
+          rule-selector: pmd:Apex
           severity-threshold: 4
-          engine: pmd
           target: tests
-          eslintconfig: .eslintrc.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

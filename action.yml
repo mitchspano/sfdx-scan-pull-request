@@ -1,26 +1,16 @@
 name: "SFDX Scan Pull Request"
-description: "Executes SFDX Scanner on the scope of a pull request, translates the findings into in-line comments."
+description: "Executes Salesforce Code Analyzer on the scope of a pull request, translates the findings into in-line comments."
 inputs:
-  category:
-    description: "Categor(ies) of rules to run."
-  engine:
-    description: "Engine(s) to run."
-  eslint-env:
-    description: "JSON-formatted string, overrides ESLint's default environment variables."
-  eslintconfig:
-    description: "Location of eslintrc config to customize eslint engine."
-  pmdconfig:
-    description: "Location of PMD rule reference XML file to customize rule selection."
-  custom-pmd-rules:
-    description: "JSON string which defines any custom rules which need to be registered before the scan is ran. Custom rules are identified by the path to their XML/JAR file and their language."
+  rule-selector:
+    description: "Space delimited rule selectors, each passed to `sf code-analyzer run --rule-selector`, e.g. `pmd:Security eslint:Recommended`. Defaults to `Recommended`."
+  config-file:
+    description: "Path to a code-analyzer.yml file used to customize engines and rules. Defaults to ./code-analyzer.yml if present."
   severity-threshold:
-    description: "Integer threshold value which will throw an error when violations of specific severity (or more severe) are detected."
+    description: "Integer threshold (1 Critical - 5 Info). Violations with this severity or more severe fail the action."
   strictly-enforced-rules:
-    description: "JSON string which contains the rules which will be strictly enforced regardless of their priority. Enforced rules are identified by their engine, category, and rule name."
+    description: "JSON string which contains the rules which will be strictly enforced regardless of their priority. Enforced rules are identified by their engine and rule name."
   target:
     description: "Optional target to specify a whole directory to run, as opposed to just the diff of a pull request"
-  tsconfig:
-    description: "Location of tsconfig.json file."
   report-mode:
     description: "Use comments or check-runs for reporting errors"
     default: "check-runs"
@@ -28,5 +18,5 @@ inputs:
     description: "Set `true` to delete comments once the issue has been resolved"
     default: "false"
 runs:
-  using: "node16"
+  using: "node20"
   main: "dist/index.js"

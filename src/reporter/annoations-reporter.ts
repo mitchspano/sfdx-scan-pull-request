@@ -23,6 +23,8 @@ import { ScannerViolation } from "../sfdxCli";
 
 export const ERROR = "Error";
 export const RIGHT = "RIGHT";
+// GitHub accepts at most 50 annotations per check-run request
+const MAX_ANNOTATIONS_PER_REQUEST = 50;
 
 export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
   /**
@@ -30,14 +32,39 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
    * @param body
    * @private
    */
-  private performGithubRequest<T>(body: GithubCheckRun) {
+  private async performGithubRequest(body: GithubCheckRun) {
     const octokit = new Octokit();
     const owner = context.repo.owner;
     const repo = context.repo.repo;
+    const annotations = body.output.annotations;
 
-    const endpoint = `POST /repos/${owner}/${repo}/check-runs`;
-
-    return octokit.request(endpoint, body) as Promise<T>;
+    const { data } = await octokit.request(
+      `POST /repos/${owner}/${repo}/check-runs`,
+      {
+        ...body,
+        output: {
+          ...body.output,
+          annotations: annotations.slice(0, MAX_ANNOTATIONS_PER_REQUEST),
+        },
+      }
+    );
+    // Updating a check run appends annotations rather than replacing them
+    for (
+      let i = MAX_ANNOTATIONS_PER_REQUEST;
+      i < annotations.length;
+      i += MAX_ANNOTATIONS_PER_REQUEST
+    ) {
+      await octokit.request(
+        `PATCH /repos/${owner}/${repo}/check-runs/${data.id}`,
+        {
+          output: {
+            title: body.output.title,
+            summary: body.output.summary,
+            annotations: annotations.slice(i, i + MAX_ANNOTATIONS_PER_REQUEST),
+          },
+        }
+      );
+    }
   }
 
   /**
@@ -64,7 +91,7 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
         status: "completed",
         conclusion: conclusion,
         output: {
-          title: "Results from sfdx-scanner",
+          title: "Results from Salesforce Code Analyzer",
           summary: `${this.issues.length} violations found`,
           annotations: this.issues,
         },
@@ -86,7 +113,7 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
    * @description Translates a violation object into a comment
    *  with a formatted body
    * @param filePath File path that the violation took place in
-   * @param violation sfdx-scanner violation
+   * @param violation Code Analyzer violation
    * @param engine The engine that discovered the violation
    */
   translateViolationToReport(
@@ -115,7 +142,7 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
       annotation_level: "notice",
       start_line: startLine,
       end_line: endLine,
-      message: `${violation.category} ${violation.message}\n${violation.url}`,
+      message: `${violation.category} ${violation.message}${violation.url ? `\n${violation.url}` : ""}`,
       title: `${violation.ruleName} (sev: ${violation.severity})`,
     });
   }

@@ -11,25 +11,20 @@
    limitations under the License.
  */
 
-import { execSync } from "child_process";
-
-export type ScannerFinding = {
-  fileName: string;
-  engine: string;
-  violations: ScannerViolation[];
-};
+import { execFileSync } from "child_process";
+import { mkdtempSync, readFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 export type ScannerFlags = {
-  category?: string;
-  engine?: string;
-  env?: string;
-  eslintconfig?: string;
-  pmdconfig?: string;
-  target: string;
-  tsConfig?: string;
+  ruleSelector?: string;
+  configFile?: string;
+  targets: string[];
 };
 
 export type ScannerViolation = {
+  fileName: string;
+  engine: string;
   category: string;
   column: string;
   endColumn: string;
@@ -43,45 +38,74 @@ export type ScannerViolation = {
 
 export type ScannerViolationType = "Error" | "Warning";
 
-type SfdxCommandResult<T> = {
-  status: 1 | 0;
-  result: T;
+type CodeAnalyzerLocation = {
+  file: string;
+  startLine: number;
+  startColumn?: number;
+  endLine?: number;
+  endColumn?: number;
 };
 
-const cli = async <T>(commandName: string, cliArgs: string[] = []) => {
-  let result = null as T;
-  try {
-    const cliCommand = `npx sfdx ${commandName} ${cliArgs.join(" ")}`;
-    console.log(cliCommand);
-    result = (
-      JSON.parse(execSync(cliCommand).toString()) as SfdxCommandResult<T>
-    ).result;
-  } catch (err) {
-    throw err;
+type CodeAnalyzerViolation = {
+  rule: string;
+  engine: string;
+  severity: number;
+  tags: string[];
+  primaryLocationIndex: number;
+  locations: CodeAnalyzerLocation[];
+  message: string;
+  resources?: string[];
+};
+
+/**
+ * @description Runs `sf code-analyzer run` and returns its violations.
+ * Selectors are whitespace delimited, e.g. "pmd:Security eslint:Recommended".
+ */
+export function scanFiles({ ruleSelector, configFile, targets }: ScannerFlags) {
+  const outDir = mkdtempSync(join(tmpdir(), "code-analyzer-"));
+  const outFile = join(outDir, "results.json");
+  const args = ["code-analyzer", "run", "--output-file", outFile];
+  for (const selector of (ruleSelector || "").split(/\s+/).filter(Boolean)) {
+    args.push("--rule-selector", selector);
   }
-  return result;
-};
-
-export async function scanFiles(scannerFlags: ScannerFlags) {
-  scannerFlags.target = `"` + scannerFlags.target + `"`;
-  const scannerCliArgs = (
-    Object.keys(scannerFlags) as Array<keyof ScannerFlags>
-  )
-    .map<string[]>((key) =>
-      scannerFlags[key] ? ([`--${key}`, scannerFlags[key]] as string[]) : []
-    )
-    .reduce((acc, [one, two]) => (one && two ? [...acc, one, two] : acc), []);
-
-  return cli<ScannerFinding[] | string>("scanner:run", [
-    ...scannerCliArgs,
-    "--json",
-  ]);
+  if (configFile) {
+    args.push("--config-file", configFile);
+  }
+  for (const target of targets) {
+    args.push("--target", target);
+  }
+  console.log(`sf ${args.join(" ")}`);
+  try {
+    execFileSync("sf", args, { stdio: ["ignore", "inherit", "inherit"] });
+    const { violations } = JSON.parse(readFileSync(outFile, "utf8")) as {
+      violations: CodeAnalyzerViolation[];
+    };
+    // Engine failures (e.g. a bad custom ruleset) are reported as violations with no file.
+    const engineErrors = violations.filter(
+      (v) => !v.locations[v.primaryLocationIndex]?.file
+    );
+    if (engineErrors.length) {
+      throw new Error(engineErrors.map((v) => v.message).join("\n"));
+    }
+    return violations.map(toScannerViolation);
+  } finally {
+    rmSync(outDir, { recursive: true, force: true });
+  }
 }
 
-export async function registerRule(path: string, language: string) {
-  return cli<ScannerFinding[] | string>("scanner:rule:add", [
-    `--path="${path}"`,
-    `--language="${language}"`,
-    "--json",
-  ]);
+function toScannerViolation(v: CodeAnalyzerViolation): ScannerViolation {
+  const loc = v.locations[v.primaryLocationIndex];
+  return {
+    fileName: loc.file,
+    engine: v.engine,
+    category: v.tags.join(", "),
+    column: String(loc.startColumn ?? ""),
+    endColumn: String(loc.endColumn ?? ""),
+    endLine: String(loc.endLine ?? ""),
+    line: String(loc.startLine),
+    message: v.message,
+    ruleName: v.rule,
+    severity: v.severity,
+    url: v.resources?.[0],
+  };
 }

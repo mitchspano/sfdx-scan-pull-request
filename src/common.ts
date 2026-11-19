@@ -3,7 +3,6 @@ import { ScannerViolation, ScannerViolationType } from "./sfdxCli";
 export type PluginInputs = {
   severityThreshold: number;
   strictlyEnforcedRules: string;
-  customPmdRules?: string;
   deleteResolvedComments: boolean;
   reportMode: string | "comments" | "check-runs";
   target: string;
@@ -12,7 +11,7 @@ export type PluginInputs = {
 export function getScannerViolationType(
   inputs: PluginInputs,
   violation: ScannerViolation,
-  engine: string
+  engine: string,
 ): ScannerViolationType {
   if (inputs.severityThreshold >= violation.severity) {
     return "Error";
@@ -20,22 +19,15 @@ export function getScannerViolationType(
   if (!inputs.strictlyEnforcedRules) {
     return "Warning";
   }
-  let violationDetail = {
-    engine: engine,
-    category: violation.category,
-    rule: violation.ruleName,
-  };
-  for (let enforcedRule of JSON.parse(inputs.strictlyEnforcedRules) as {
-    [key in string]: string;
-  }[]) {
-    if (
-      Object.entries(violationDetail).toString() ===
-      Object.entries(enforcedRule).toString()
-    ) {
-      return "Error";
-    }
-  }
-  return "Warning";
+  const enforcedRules = JSON.parse(inputs.strictlyEnforcedRules) as {
+    engine: string;
+    rule: string;
+  }[];
+  return enforcedRules.some(
+    (r) => r.engine === engine && r.rule === violation.ruleName,
+  )
+    ? "Error"
+    : "Warning";
 }
 
 export function getGithubFilePath(commitId: string, filePath: string) {

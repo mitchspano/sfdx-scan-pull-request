@@ -178,7 +178,7 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
    * @description Translates a violation object into a comment
    *  with a formatted body
    * @param filePath File path that the violation took place in
-   * @param violation sfdx-scanner violation
+   * @param violation Code Analyzer violation
    * @param engine The engine that discovered the violation
    * @returns {} The comment that will be submitted to GitHub
    */
@@ -248,7 +248,7 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
 | Rule | ${violation.ruleName} |
 | Severity | ${violation.severity} |
 | Type | ${violationType} |
-| Message| [${violation.message.trim()}](${violation.url}) |
+| Message| ${violation.url ? `[${violation.message.trim()}](${violation.url})` : violation.message.trim()} |
 | File | [${filePath}](${getGithubFilePath(commit_id, filePath)}) |`;
   }
 }
