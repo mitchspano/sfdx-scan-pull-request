@@ -17,7 +17,7 @@ import { context } from "@actions/github";
 import { getDiffInPullRequest, GithubPullRequest } from "./git-actions";
 
 import { scanFiles, ScannerFlags, ScannerViolation } from "./sfdxCli";
-import { PluginInputs } from "./common";
+import { getChangedLineAnchor, PluginInputs } from "./common";
 import { CommentsReporter } from "./reporter/comments-reporter";
 import { AnnotationsReporter } from "./reporter/annoations-reporter";
 import { Reporter } from "./reporter/reporter.types";
@@ -120,36 +120,24 @@ function filterFindingsToDiffScope(
 
   for (let violation of violations) {
     const filePath = violation.fileName.replace(process.cwd() + "/", "");
-    const relevantLines =
-      filePathToChangedLines.get(filePath) || new Set<number>();
-    if (!isInChangedLines(violation, relevantLines) && !inputs.target) {
+    if (inputs.target) {
+      reporter.translateViolationToReport(filePath, violation, violation.engine);
       continue;
     }
-    reporter.translateViolationToReport(filePath, violation, violation.engine);
-  }
-}
-
-/**
- * @description Determines if all lines within a violation have changed
- * @returns Boolean
- */
-function isInChangedLines(
-  violation: ScannerViolation,
-  relevantLines: Set<number>
-) {
-  if (!violation.endLine) {
-    return relevantLines.has(parseInt(violation.line));
-  }
-  for (
-    let i = parseInt(violation.line);
-    i <= parseInt(violation.endLine);
-    i++
-  ) {
-    if (relevantLines.has(i) == false) {
-      return false;
+    // Report when any line of the violation changed in the diff
+    const anchor = getChangedLineAnchor(
+      violation,
+      filePathToChangedLines.get(filePath) || new Set<number>()
+    );
+    if (anchor) {
+      reporter.translateViolationToReport(
+        filePath,
+        violation,
+        violation.engine,
+        anchor
+      );
     }
   }
-  return true;
 }
 
 /**

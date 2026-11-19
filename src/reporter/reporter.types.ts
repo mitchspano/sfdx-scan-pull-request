@@ -11,7 +11,7 @@
    limitations under the License.
  */
 
-import { PluginInputs } from "../common";
+import { LineRange, PluginInputs } from "../common";
 import { ScannerViolation } from "../sfdxCli";
 import { Context } from "@actions/github/lib/context";
 import { setFailed } from "@actions/core";
@@ -49,8 +49,9 @@ export type GithubAnnotation = {
 export type GithubComment = {
   commit_id: string;
   path: string;
-  start_line: number;
-  start_side: GithubCommentSide;
+  // Omitted for single-line comments
+  start_line?: number;
+  start_side?: GithubCommentSide;
   side: GithubCommentSide;
   line: number;
   body: string;
@@ -70,10 +71,14 @@ export type ReporterProps = {
 
 export interface Reporter {
   write(): void;
+  /**
+   * @param anchor Changed lines within the violation, when reporting on a diff
+   */
   translateViolationToReport(
     filePath: string,
     violation: ScannerViolation,
-    engine: string
+    engine: string,
+    anchor?: LineRange
   ): void;
 }
 
@@ -97,7 +102,8 @@ export abstract class BaseReporter<T> implements Reporter {
   translateViolationToReport(
     _filePath: string,
     _violation: ScannerViolation,
-    _engine: string
+    _engine: string,
+    _anchor?: LineRange
   ): void {
     throw new Error("Method not implemented.");
   }

@@ -51,7 +51,9 @@ export async function getDiffInPullRequest(
       const changedLines = new Set<number>();
       for (let chunk of file.chunks) {
         for (let change of chunk.changes) {
-          if (change.type === "add" || change.type === "del") {
+          // Only added lines have line numbers in the new file; a deleted
+          // line's number refers to the old file.
+          if (change.type === "add") {
             changedLines.add(change.ln);
           }
         }
