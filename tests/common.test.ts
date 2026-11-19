@@ -1,6 +1,6 @@
 import { expect, it, describe } from "@jest/globals";
 
-import { getChangedLineAnchor } from "../src/common";
+import { getAnnotationLevel, getChangedLineAnchor } from "../src/common";
 import { ScannerViolation } from "../src/sfdxCli";
 
 const violation = (line: number, endLine?: number) =>
@@ -47,5 +47,22 @@ describe("getChangedLineAnchor", () => {
     expect(
       getChangedLineAnchor(violation(10, 20), new Set([1, 9, 21])),
     ).toBeUndefined();
+  });
+});
+
+describe("getAnnotationLevel", () => {
+  it("marks anything that blocks the build as failure (red)", () => {
+    expect(getAnnotationLevel("Error", 1)).toBe("failure");
+    expect(getAnnotationLevel("Error", 5)).toBe("failure");
+  });
+
+  it("marks non-blocking severities 1-3 as warning (yellow)", () => {
+    expect(getAnnotationLevel("Warning", 1)).toBe("warning");
+    expect(getAnnotationLevel("Warning", 3)).toBe("warning");
+  });
+
+  it("marks non-blocking severities 4-5 as notice (gray)", () => {
+    expect(getAnnotationLevel("Warning", 4)).toBe("notice");
+    expect(getAnnotationLevel("Warning", 5)).toBe("notice");
   });
 });

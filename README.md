@@ -61,7 +61,7 @@ Optionally provide this to scan a whole directory instead of just the diff. If t
 
 Details which way to report issues back to GitHub, can be either:
 
-- `check-runs` - Shows findings as annotations on the PR (default)
+- `check-runs` - Shows findings as annotations on the PR (default). Annotations are red (`failure`) for findings that fail the action, yellow (`warning`) for other severity 1–3 findings, and gray (`notice`) for severity 4–5.
 - `comments` - Shows findings as comments
 
 ## `delete-resolved-comments`

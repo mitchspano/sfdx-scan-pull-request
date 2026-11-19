@@ -11,7 +11,7 @@
    limitations under the License.
  */
 
-import { getScannerViolationType } from "../common";
+import { getAnnotationLevel, getScannerViolationType } from "../common";
 import { Octokit } from "@octokit/action";
 import { context } from "@actions/github";
 import {
@@ -165,7 +165,7 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
     this.issues.push({
       path: filePath,
       start_side: RIGHT,
-      annotation_level: "notice",
+      annotation_level: getAnnotationLevel(violationType, violation.severity),
       start_line: startLine,
       end_line: endLine,
       message: `${violation.category} ${violation.message}${violation.url ? `\n${violation.url}` : ""}`,
