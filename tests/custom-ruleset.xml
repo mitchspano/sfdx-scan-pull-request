@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<ruleset name="Custom" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0">
+  <description>custom</description>
+  <rule name="NoTestClassesNamedExample" language="apex" message="No Example classes" class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+    <priority>2</priority>
+    <properties><property name="xpath"><value>//UserClass[@SimpleName='ExampleClass']</value></property></properties>
+  </rule>
+</ruleset>

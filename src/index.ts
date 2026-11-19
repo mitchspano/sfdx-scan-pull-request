@@ -16,13 +16,7 @@ import { context } from "@actions/github";
 
 import { getDiffInPullRequest, GithubPullRequest } from "./git-actions";
 
-import {
-  scanFiles,
-  registerRule,
-  ScannerFinding,
-  ScannerFlags,
-  ScannerViolation,
-} from "./sfdxCli";
+import { scanFiles, ScannerFlags, ScannerViolation } from "./sfdxCli";
 import { PluginInputs } from "./common";
 import { CommentsReporter } from "./reporter/comments-reporter";
 import { AnnotationsReporter } from "./reporter/annoations-reporter";
@@ -40,20 +34,15 @@ interface ExecSyncError {
  * https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#inputs
  */
 function initialSetup() {
-  const scannerFlags = {
-    category: getInput("category"),
-    engine: getInput("engine"),
-    env: getInput("eslint-env"),
-    eslintconfig: getInput("eslintconfig"),
-    pmdconfig: getInput("pmdconfig"),
-    tsConfig: getInput("tsconfig"),
-  } as ScannerFlags;
+  const scannerFlags: ScannerFlags = {
+    ruleSelector: getInput("rule-selector"),
+    configFile: getInput("config-file"),
+    targets: [],
+  };
 
-  // TODO: validate inputs. Technically the scanner's "max" violation level is 3,
-  // where: 1 (high), 2 (moderate), and 3 (low)
+  // Code Analyzer severities: 1 (Critical) through 5 (Info)
   const inputs: PluginInputs = {
     reportMode: getInput("report-mode") || "check-runs",
-    customPmdRules: getInput("custom-pmd-rules"),
     severityThreshold: parseInt(getInput("severity-threshold")) || 0,
     strictlyEnforcedRules: getInput("strictly-enforced-rules"),
     deleteResolvedComments: getInput("delete-resolved-comments") === "true",
@@ -91,18 +80,17 @@ function validateContext(pullRequest: GithubPullRequest, target: string) {
 }
 
 /**
- * @description Uses the sfdx scanner to run static code analysis on
- * all files within the temporary directory.
+ * @description Uses Salesforce Code Analyzer to run static code analysis on
+ * the relevant files.
  */
-export async function performStaticCodeAnalysisOnFilesInDiff(
+export function performStaticCodeAnalysisOnFilesInDiff(
   scannerFlags: ScannerFlags
-) {
+): ScannerViolation[] {
   console.log(
     "Performing static code analysis on all of the relevant files..."
   );
   try {
-    const findings = await scanFiles(scannerFlags);
-    return typeof findings === "string" ? [] : findings;
+    return scanFiles(scannerFlags);
   } catch (err) {
     const typedErr = err as unknown as ExecSyncError;
     console.error({
@@ -117,13 +105,11 @@ export async function performStaticCodeAnalysisOnFilesInDiff(
 }
 
 /**
- * @description Parses the findings from the sfdx scanner execution
- * and determines if any of the findings are for lines which have changed.
- * If a finding exists and covers a changed line, then translate that finding
- * object into a comment object.
+ * @description Determines which violations are on lines which have changed
+ * and passes those to the reporter.
  */
 function filterFindingsToDiffScope(
-  findings: ScannerFinding[],
+  violations: ScannerViolation[],
   filePathToChangedLines: Map<string, Set<number>>,
   inputs: PluginInputs,
   reporter: Reporter
@@ -132,16 +118,14 @@ function filterFindingsToDiffScope(
     "Filtering the findings to just the lines which are part of the context..."
   );
 
-  for (let finding of findings) {
-    const filePath = finding.fileName.replace(process.cwd() + "/", "");
+  for (let violation of violations) {
+    const filePath = violation.fileName.replace(process.cwd() + "/", "");
     const relevantLines =
       filePathToChangedLines.get(filePath) || new Set<number>();
-    for (let violation of finding.violations) {
-      if (!isInChangedLines(violation, relevantLines) && !inputs.target) {
-        continue;
-      }
-      reporter.translateViolationToReport(filePath, violation, finding.engine);
+    if (!isInChangedLines(violation, relevantLines) && !inputs.target) {
+      continue;
     }
+    reporter.translateViolationToReport(filePath, violation, violation.engine);
   }
 }
 
@@ -176,8 +160,8 @@ function isInChangedLines(
  */
 function getFilesToScan(
   filePathToChangedLines: Map<string, Set<number>>,
-  target: String
-): String[] {
+  target: string
+): string[] {
   if (target) {
     return [target];
   }
@@ -188,28 +172,6 @@ function getFilesToScan(
     }
   }
   return pathsWithChangedLines;
-}
-
-/**
- * @description Calls `scanner:rule:add` for every custom rule defined as input
- */
-async function registerCustomPmdRules(rules: string) {
-  for (let rule of JSON.parse(rules) as {
-    [key in string]: string;
-  }[]) {
-    try {
-      await registerRule(rule.path, rule.language);
-    } catch (err) {
-      const typedErr = err as unknown as ExecSyncError;
-      console.error({
-        message: typedErr.message,
-        status: typedErr.status,
-        stack: typedErr.stack,
-        output: typedErr.output?.toString(),
-      });
-      setFailed("Something went wrong when registering custom rule.");
-    }
-  }
 }
 
 /**
@@ -232,15 +194,9 @@ async function main() {
     console.log("There are no files to scan - exiting now.");
     return;
   }
-  scannerFlags.target = filesToScan.join(",");
+  scannerFlags.targets = filesToScan;
 
-  if (inputs.customPmdRules) {
-    registerCustomPmdRules(inputs.customPmdRules);
-  }
-
-  const diffFindings = await performStaticCodeAnalysisOnFilesInDiff(
-    scannerFlags
-  );
+  const diffFindings = performStaticCodeAnalysisOnFilesInDiff(scannerFlags);
   filterFindingsToDiffScope(
     diffFindings,
     filePathToChangedLines,

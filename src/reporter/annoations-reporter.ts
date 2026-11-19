@@ -64,7 +64,7 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
         status: "completed",
         conclusion: conclusion,
         output: {
-          title: "Results from sfdx-scanner",
+          title: "Results from Salesforce Code Analyzer",
           summary: `${this.issues.length} violations found`,
           annotations: this.issues,
         },
@@ -86,7 +86,7 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
    * @description Translates a violation object into a comment
    *  with a formatted body
    * @param filePath File path that the violation took place in
-   * @param violation sfdx-scanner violation
+   * @param violation Code Analyzer violation
    * @param engine The engine that discovered the violation
    */
   translateViolationToReport(

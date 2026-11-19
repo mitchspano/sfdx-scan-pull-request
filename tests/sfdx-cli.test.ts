@@ -2,84 +2,66 @@ import { expect, it, describe } from "@jest/globals";
 
 import { scanFiles } from "../src/sfdxCli";
 
-const thirtySecondsRunTime = 1000 * 30;
+const twoMinutes = 1000 * 120;
 
 describe("CLI tests!", () => {
   it(
     "reports pmd violations successfully",
-    async () => {
-      const scannerFlags = {
-        engine: "pmd",
-        pmdconfig: undefined,
-        target: "tests/ExampleClass.cls",
-      };
-
-      const findings = await scanFiles(scannerFlags);
-      expect(findings).toBeTruthy();
-
-      if (typeof findings === "string") {
-        // auto fail the test if no violations were found
-        expect(findings).toBeFalsy();
-        return;
-      }
-
-      const scannerViolations = findings[0].violations;
-      expect(scannerViolations.length).toBe(4);
+    () => {
+      const violations = scanFiles({
+        ruleSelector: "pmd",
+        targets: ["tests/ExampleClass.cls"],
+      });
+      expect(violations.every((v) => v.engine === "pmd")).toBe(true);
+      expect(violations[0].fileName).toBe("tests/ExampleClass.cls");
       expect(
-        scannerViolations.find(
-          (violation) =>
-            violation.ruleName === "ApexUnitTestClassShouldHaveAsserts"
+        violations.find(
+          (v) => v.ruleName === "ApexUnitTestClassShouldHaveAsserts"
         )
       ).toBeTruthy();
       expect(
-        scannerViolations.find(
-          (violation) => violation.ruleName === "EmptyStatementBlock"
-        )
+        violations.find((v) => v.ruleName === "EmptyStatementBlock")
       ).toBeTruthy();
     },
-    thirtySecondsRunTime
+    twoMinutes
   );
 
   it(
     "reports eslint violations successully",
-    async () => {
-      const scannerFlags = {
-        engine: "eslint",
-        target: "tests/example-lwc.js",
-      };
-
-      const findings = await scanFiles(scannerFlags);
-
-      if (typeof findings === "string") {
-        // auto fail the test if no violations were found
-        expect(findings).toBeFalsy();
-        return;
-      }
-
-      expect(findings).toBeTruthy();
-      expect(findings[0]?.violations.length).toBeGreaterThan(0);
-
-      expect(
-        findings[0].violations.filter(
-          (violation) => violation.ruleName === "no-console"
-        )
-      ).toBeTruthy();
+    () => {
+      const violations = scanFiles({
+        ruleSelector: "eslint",
+        targets: ["tests/example-lwc.js"],
+      });
+      expect(violations.find((v) => v.ruleName === "no-console")).toBeTruthy();
     },
-    thirtySecondsRunTime
+    twoMinutes
   );
 
   it(
     "handles spaces in file names",
-    async () => {
-      const scannerFlags = {
-        engine: "eslint",
-        target: "README.md,tests/Example Layout.layout-meta.xml",
-      };
-
-      const findings = await scanFiles(scannerFlags);
-
-      expect(typeof findings).toBe("string");
+    () => {
+      const violations = scanFiles({
+        ruleSelector: "eslint",
+        targets: ["README.md", "tests/Example Layout.layout-meta.xml"],
+      });
+      expect(violations).toEqual([]);
     },
-    thirtySecondsRunTime
+    twoMinutes
+  );
+
+  it(
+    "runs custom PMD rules from a config file",
+    () => {
+      const violations = scanFiles({
+        ruleSelector: "NoTestClassesNamedExample",
+        configFile: "tests/code-analyzer.yml",
+        targets: ["tests/ExampleClass.cls"],
+      });
+      expect(violations.map((v) => v.ruleName)).toEqual([
+        "NoTestClassesNamedExample",
+      ]);
+    },
+    twoMinutes
   );
 });
