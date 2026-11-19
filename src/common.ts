@@ -30,6 +30,22 @@ export function getScannerViolationType(
     : "Warning";
 }
 
+export type AnnotationLevel = "failure" | "warning" | "notice";
+
+/**
+ * @description Colors a check-run annotation: red for anything that blocks the
+ * build, yellow for non-blocking Critical/High/Moderate (1-3), gray for Low/Info (4-5).
+ */
+export function getAnnotationLevel(
+  violationType: ScannerViolationType,
+  severity: number,
+): AnnotationLevel {
+  if (violationType === "Error") {
+    return "failure";
+  }
+  return severity <= 3 ? "warning" : "notice";
+}
+
 export type LineRange = { start: number; end: number };
 
 /**

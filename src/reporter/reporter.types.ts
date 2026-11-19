@@ -11,7 +11,7 @@
    limitations under the License.
  */
 
-import { LineRange, PluginInputs } from "../common";
+import { AnnotationLevel, LineRange, PluginInputs } from "../common";
 import { ScannerViolation } from "../sfdxCli";
 import { Context } from "@actions/github/lib/context";
 import { setFailed } from "@actions/core";
@@ -39,7 +39,7 @@ export type GithubCheckRun = {
 export type GithubAnnotation = {
   path: string;
   start_side: string;
-  annotation_level: "notice"; // add,
+  annotation_level: AnnotationLevel;
   start_line: number;
   end_line: number;
   message: string;
