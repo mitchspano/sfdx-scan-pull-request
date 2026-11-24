@@ -30,6 +30,7 @@ const commitFile = (cwd: string, file: string, content: string) => {
 describe("getDiffInPullRequest", () => {
   let root: string;
   let checkout: string;
+  let shallowCheckout: string;
   let baseSha: string;
   let headSha: string;
 
@@ -59,6 +60,14 @@ describe("getDiffInPullRequest", () => {
     git(root, "clone", "-q", upstream, checkout);
     git(checkout, "fetch", "-q", "origin", "refs/pull/1/head");
     git(checkout, "checkout", "-q", "--detach", "FETCH_HEAD");
+
+    // Like GitHub, serve unadvertised commits that are reachable by SHA
+    git(upstream, "config", "uploadpack.allowReachableSHA1InWant", "true");
+    // Mimics actions/checkout with the default fetch-depth: 1
+    shallowCheckout = join(root, "shallow");
+    git(root, "clone", "-q", "--depth", "1", `file://${upstream}`, shallowCheckout);
+    git(shallowCheckout, "fetch", "-q", "--depth", "1", "origin", "refs/pull/1/head");
+    git(shallowCheckout, "checkout", "-q", "--detach", "FETCH_HEAD");
   });
 
   afterAll(() => {
@@ -71,6 +80,15 @@ describe("getDiffInPullRequest", () => {
     expect([...diff.keys()].sort()).toEqual(["Added.cls", "Existing.cls"]);
     expect([...diff.get("Existing.cls")!]).toEqual([2]);
     expect([...diff.get("Added.cls")!]).toEqual([1, 2]);
+  });
+
+  it("fetches the commits and history after a shallow checkout", async () => {
+    expect(git(shallowCheckout, "rev-parse", "--is-shallow-repository")).toBe("true");
+
+    const diff = await getDiffInPullRequest(baseSha, headSha, shallowCheckout);
+
+    expect([...diff.keys()].sort()).toEqual(["Added.cls", "Existing.cls"]);
+    expect([...diff.get("Existing.cls")!]).toEqual([2]);
   });
 
   it("does not leave files in the workspace", async () => {
@@ -93,7 +111,7 @@ describe("getDiffInPullRequest", () => {
     expect(existsSync(join(checkout, "pwned"))).toBe(false);
   });
 
-  it("explains how to fix a missing commit", async () => {
+  it("explains how to fix a commit that cannot be fetched", async () => {
     await expect(
       getDiffInPullRequest("f".repeat(40), headSha, checkout)
     ).rejects.toThrow("fetch-depth: 0");

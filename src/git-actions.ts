@@ -23,20 +23,62 @@ export type GithubPullRequest = typeof context.payload.pull_request | undefined;
 // Full SHA-1 or SHA-256 object names
 const COMMIT_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 
-function assertCommitAvailable(sha: string, label: string, cwd: string) {
+function assertValidSha(sha: string, label: string) {
   if (!COMMIT_SHA.test(sha ?? "")) {
     throw new Error(`Invalid ${label} commit SHA: ${JSON.stringify(sha)}`);
   }
+}
+
+function hasCommit(sha: string, cwd: string) {
   try {
     execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], {
       cwd,
       stdio: "ignore",
     });
+    return true;
   } catch {
-    throw new Error(
-      `The ${label} commit ${sha} is not in the local repository. ` +
-        "Check out the repository with `fetch-depth: 0`."
-    );
+    return false;
+  }
+}
+
+/**
+ * @description Fetches the base and head commits with their history when they
+ * are not available, e.g. after a default `fetch-depth: 1` checkout. GitHub
+ * serves any reachable commit by SHA, including a fork's head commit via
+ * `refs/pull/<number>/head`.
+ */
+function ensureCommitsAvailable(baseSha: string, headSha: string, cwd: string) {
+  const isShallow =
+    execFileSync("git", ["rev-parse", "--is-shallow-repository"], { cwd })
+      .toString()
+      .trim() === "true";
+  if (!isShallow && hasCommit(baseSha, cwd) && hasCommit(headSha, cwd)) {
+    return;
+  }
+  console.log("Fetching the pull request commits and their history...");
+  const args = ["fetch", "--no-tags", "--no-recurse-submodules", "--quiet"];
+  if (isShallow) {
+    // A merge base is needed for the diff, so the full history is required
+    args.push("--unshallow");
+  }
+  try {
+    execFileSync("git", [...args, "origin", baseSha, headSha], {
+      cwd,
+      stdio: ["ignore", "ignore", "inherit"],
+    });
+  } catch {
+    // Reported below with a clearer message
+  }
+  for (const [sha, label] of [
+    [baseSha, "base"],
+    [headSha, "head"],
+  ]) {
+    if (!hasCommit(sha, cwd)) {
+      throw new Error(
+        `The ${label} commit ${sha} is not in the local repository and could not be fetched. ` +
+          "Check out the repository with `fetch-depth: 0`."
+      );
+    }
   }
 }
 
@@ -48,7 +90,8 @@ function assertCommitAvailable(sha: string, label: string, cwd: string) {
  * request from a fork does not exist in the base repository, and branch names
  * are chosen by the pull request author, so they must never reach a shell.
  * Both commits are present after `actions/checkout` with `fetch-depth: 0`,
- * because the checked-out merge commit has the head commit as a parent.
+ * because the checked-out merge commit has the head commit as a parent;
+ * otherwise they are fetched from `origin`.
  */
 export async function getDiffInPullRequest(
   baseSha: string,
@@ -59,8 +102,9 @@ export async function getDiffInPullRequest(
     baseSha,
     headSha,
   });
-  assertCommitAvailable(baseSha, "base", cwd);
-  assertCommitAvailable(headSha, "head", cwd);
+  assertValidSha(baseSha, "base");
+  assertValidSha(headSha, "head");
+  ensureCommitsAvailable(baseSha, headSha, cwd);
 
   /**
    * Keeping git diff output in memory throws `code: 'ENOBUFS'` error when
