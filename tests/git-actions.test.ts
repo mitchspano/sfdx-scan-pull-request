@@ -1,59 +1,119 @@
-import { expect, it, describe } from "@jest/globals";
-import { execSync } from "child_process";
-import { writeFileSync, unlinkSync } from "fs";
+import { expect, it, describe, beforeAll, afterAll } from "@jest/globals";
+import { execFileSync } from "child_process";
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 import { getDiffInPullRequest } from "../src/git-actions";
 
-// useful for local testing; omitted via CI runs due to ambiguous references
-describe.skip("Git action tests", () => {
-  it("returns diff info successfully", async () => {
-    const testFilePath = "github-test-file";
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync("git", args, {
+    cwd,
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: "test",
+      GIT_AUTHOR_EMAIL: "test@example.com",
+      GIT_COMMITTER_NAME: "test",
+      GIT_COMMITTER_EMAIL: "test@example.com",
+    },
+  })
+    .toString()
+    .trim();
 
-    writeFileSync(testFilePath, "some data to write");
-    execSync(`git add ${testFilePath}`);
+const commitFile = (cwd: string, file: string, content: string) => {
+  writeFileSync(join(cwd, file), content);
+  git(cwd, "add", file);
+  git(cwd, "commit", "-q", "-m", `update ${file}`);
+  return git(cwd, "rev-parse", "HEAD");
+};
 
-    const diff = await getDiffInPullRequest([
-      execSync("git rev-parse --abbrev-ref HEAD").toString().trim(),
-    ]);
+describe("getDiffInPullRequest", () => {
+  let root: string;
+  let checkout: string;
+  let shallowCheckout: string;
+  let baseSha: string;
+  let headSha: string;
 
-    const newLines = diff.get(testFilePath);
+  // upstream <- fork; the PR branch exists only in the fork.
+  // checkout mimics actions/checkout of refs/pull/1/merge with fetch-depth: 0.
+  beforeAll(() => {
+    root = mkdtempSync(join(tmpdir(), "git-actions-test-"));
+    const upstream = join(root, "upstream");
+    const fork = join(root, "fork");
+    checkout = join(root, "checkout");
 
-    try {
-      expect(newLines).toBeTruthy();
-      expect(newLines?.size).toBeGreaterThan(0);
-    } catch (_) {
-      throw _;
-    } finally {
-      unlinkSync(testFilePath);
-      execSync(`git add ${testFilePath}`);
-    }
+    git(root, "init", "-q", "-b", "main", upstream);
+    commitFile(upstream, "Existing.cls", "line 1\nline 2\nline 3\n");
+
+    git(root, "clone", "-q", upstream, fork);
+    // A branch name a PR author could pick to attempt command injection
+    git(fork, "checkout", "-q", "-b", "x$(touch${IFS}pwned)");
+    commitFile(fork, "Existing.cls", "line 1\nchanged\nline 3\n");
+    headSha = commitFile(fork, "Added.cls", "a\nb\n");
+
+    // The base moves on after the PR was opened
+    baseSha = git(upstream, "rev-parse", "HEAD");
+    commitFile(upstream, "Unrelated.cls", "unrelated\n");
+
+    // GitHub exposes the fork's commits on the upstream as refs/pull/1/head
+    git(upstream, "fetch", "-q", fork, `${headSha}:refs/pull/1/head`);
+    git(root, "clone", "-q", upstream, checkout);
+    git(checkout, "fetch", "-q", "origin", "refs/pull/1/head");
+    git(checkout, "checkout", "-q", "--detach", "FETCH_HEAD");
+
+    // Like GitHub, serve unadvertised commits that are reachable by SHA
+    git(upstream, "config", "uploadpack.allowReachableSHA1InWant", "true");
+    // Mimics actions/checkout with the default fetch-depth: 1
+    shallowCheckout = join(root, "shallow");
+    git(root, "clone", "-q", "--depth", "1", `file://${upstream}`, shallowCheckout);
+    git(shallowCheckout, "fetch", "-q", "--depth", "1", "origin", "refs/pull/1/head");
+    git(shallowCheckout, "checkout", "-q", "--detach", "FETCH_HEAD");
   });
 
-  const fiftySecondsRunTime = 50 * 1000;
+  afterAll(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
 
-  it(
-    "adds remote origin & properly points PR args to git remotes",
-    async () => {
-      const removeRemote = () => {
-        try {
-          execSync("git remote remove destination");
-        } catch (_) {
-          // no-op
-        }
-      };
+  it("diffs a fork PR by commit SHA, without its head branch", async () => {
+    const diff = await getDiffInPullRequest(baseSha, headSha, checkout);
 
-      removeRemote();
-      const pullRequestArgs = ["main", "main"];
-      await getDiffInPullRequest(
-        pullRequestArgs,
-        "https://github.com/mitchspano/sfdx-scan-pull-request.git"
-      );
+    expect([...diff.keys()].sort()).toEqual(["Added.cls", "Existing.cls"]);
+    expect([...diff.get("Existing.cls")!]).toEqual([2]);
+    expect([...diff.get("Added.cls")!]).toEqual([1, 2]);
+  });
 
-      const remotes = execSync("git remote").toString();
+  it("fetches the commits and history after a shallow checkout", async () => {
+    expect(git(shallowCheckout, "rev-parse", "--is-shallow-repository")).toBe("true");
 
-      expect(remotes.indexOf("destination") > -1).toBeTruthy();
-      removeRemote();
-    },
-    fiftySecondsRunTime
-  );
+    const diff = await getDiffInPullRequest(baseSha, headSha, shallowCheckout);
+
+    expect([...diff.keys()].sort()).toEqual(["Added.cls", "Existing.cls"]);
+    expect([...diff.get("Existing.cls")!]).toEqual([2]);
+  });
+
+  it("does not leave files in the workspace", async () => {
+    const before = readdirSync(checkout).sort();
+    await getDiffInPullRequest(baseSha, headSha, checkout);
+    expect(readdirSync(checkout).sort()).toEqual(before);
+    expect(existsSync(join(checkout, "pwned"))).toBe(false);
+  });
+
+  it.each([
+    "main",
+    "x$(touch pwned)",
+    "--output=/tmp/pwned",
+    `${"a".repeat(40)};touch pwned`,
+    undefined,
+  ])("rejects a non-SHA ref: %s", async (ref) => {
+    await expect(
+      getDiffInPullRequest(baseSha, ref as string, checkout)
+    ).rejects.toThrow("Invalid head commit SHA");
+    expect(existsSync(join(checkout, "pwned"))).toBe(false);
+  });
+
+  it("explains how to fix a commit that cannot be fetched", async () => {
+    await expect(
+      getDiffInPullRequest("f".repeat(40), headSha, checkout)
+    ).rejects.toThrow("fetch-depth: 0");
+  });
 });
