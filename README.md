@@ -107,6 +107,17 @@ jobs:
 
 Code Analyzer requires Java 11+ (PMD) and Python 3.10+ (Flow engine); both are preinstalled on `ubuntu-latest`.
 
+### Pull requests from forks
+
+Pull requests from forks (and from Dependabot) get a read-only `GITHUB_TOKEN`, so the action cannot create check runs or comments. When GitHub denies the write, the action reports the findings without the API instead:
+
+- a table of every finding in the step log and the workflow run's job summary
+- annotations on the pull request's changed files, up to 10 per level (GitHub's per-step limit)
+
+Strictly enforced findings and findings at or above `severity-threshold` still fail the action.
+
+Do not switch to `pull_request_target` and check out the pull request's code to get a write token. Code Analyzer loads `code-analyzer.yml` from the checkout, and it can load custom PMD rules and ESLint plugins, so a malicious pull request could run code with write access and your repository's secrets.
+
 ## Migrating from v0.1.x
 
 v0.2.0 replaces the retired `@salesforce/sfdx-scanner` plugin with Code Analyzer v5.

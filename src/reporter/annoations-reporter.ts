@@ -20,6 +20,11 @@ import {
   GithubCheckRun,
 } from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
+import {
+  getReadOnlyReason,
+  isPermissionDenied,
+  reportWithoutApi,
+} from "./fallback";
 
 export const ERROR = "Error";
 export const RIGHT = "RIGHT";
@@ -131,6 +136,14 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
         console.error(
           "Error when creating check run: " + JSON.stringify(error, null, 2)
         );
+        // Any failure would otherwise lose the findings, so report them anyway
+        await reportWithoutApi(
+          this.findings,
+          isPermissionDenied(error)
+            ? getReadOnlyReason(this.context, "checks")
+            : `Creating the check run failed: ${(error as Error).message}`,
+          this.context
+        );
       }
     }
   }
@@ -155,6 +168,7 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
     if (violationType === ERROR) {
       this.hasHaltingError = true;
     }
+    this.recordFinding(filePath, violation, violationType);
     let endLine = violation.endLine
       ? parseInt(violation.endLine)
       : parseInt(violation.line);

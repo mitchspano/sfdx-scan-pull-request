@@ -11,8 +11,14 @@
    limitations under the License.
  */
 
-import { AnnotationLevel, LineRange, PluginInputs } from "../common";
-import { ScannerViolation } from "../sfdxCli";
+import {
+  AnnotationLevel,
+  getAnnotationLevel,
+  LineRange,
+  PluginInputs,
+} from "../common";
+import { ScannerViolation, ScannerViolationType } from "../sfdxCli";
+import { Finding } from "./fallback";
 import { Context } from "@actions/github/lib/context";
 import { setFailed } from "@actions/core";
 
@@ -88,10 +94,13 @@ export abstract class BaseReporter<T> implements Reporter {
   protected hasHaltingError;
   protected inputs: PluginInputs;
   protected issues: T[];
+  // Every reported violation, for reporting without the API if writes are denied
+  protected findings: Finding[];
   protected context: Context;
   constructor({ context, inputs }: ReporterProps) {
     this.hasHaltingError = false;
     this.issues = [];
+    this.findings = [];
     this.context = context;
     this.inputs = inputs;
   }
@@ -106,6 +115,23 @@ export abstract class BaseReporter<T> implements Reporter {
     _anchor?: LineRange
   ): void {
     throw new Error("Method not implemented.");
+  }
+
+  protected recordFinding(
+    path: string,
+    violation: ScannerViolation,
+    violationType: ScannerViolationType
+  ) {
+    const startLine = parseInt(violation.line);
+    const endLine = violation.endLine ? parseInt(violation.endLine) : startLine;
+    this.findings.push({
+      path,
+      startLine,
+      endLine: Math.max(startLine, endLine),
+      level: getAnnotationLevel(violationType, violation.severity),
+      violationType,
+      violation,
+    });
   }
 
   checkHasHaltingError() {
