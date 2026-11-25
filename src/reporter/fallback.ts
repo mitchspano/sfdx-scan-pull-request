@@ -11,28 +11,20 @@
    limitations under the License.
  */
 
-import { AnnotationProperties, error, notice, summary, warning } from "@actions/core";
+import { AnnotationProperties, error, notice, warning } from "@actions/core";
 import { Context } from "@actions/github/lib/context";
-import { AnnotationLevel } from "../common";
-import { ScannerViolation, ScannerViolationType } from "../sfdxCli";
-
-/**
- * @description A finding as it would have been reported, kept so it can be
- * reported without the GitHub API when the token cannot write.
- */
-export type Finding = {
-  path: string;
-  startLine: number;
-  endLine: number;
-  level: AnnotationLevel;
-  violationType: ScannerViolationType;
-  violation: ScannerViolation;
-};
+import {
+  cell,
+  Finding,
+  formatLines,
+  formatRule,
+  LEVEL_ORDER,
+  plural,
+  sortFindings,
+} from "./findings";
 
 // GitHub shows at most 10 annotations of each level per step
 export const MAX_ANNOTATIONS_PER_LEVEL = 10;
-
-const LEVEL_ORDER: AnnotationLevel[] = ["failure", "warning", "notice"];
 
 /**
  * @description True when GitHub rejected a request because the token lacks
@@ -68,51 +60,17 @@ export function getReadOnlyReason(context: Context, permission: string): string 
   return `The GITHUB_TOKEN cannot write. Grant the workflow \`permissions: ${permission}: write\`.`;
 }
 
-function sortFindings(findings: Finding[]): Finding[] {
-  return [...findings].sort(
-    (a, b) =>
-      LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level) ||
-      a.violation.severity - b.violation.severity ||
-      a.path.localeCompare(b.path) ||
-      a.startLine - b.startLine
-  );
-}
-
-// Keeps a value inside one markdown table cell
-function cell(value: string): string {
-  return value
-    .trim()
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\|/g, "\\|")
-    .replace(/\r?\n/g, " ");
-}
-
-function lines(finding: Finding): string {
-  return finding.startLine === finding.endLine
-    ? `${finding.startLine}`
-    : `${finding.startLine}-${finding.endLine}`;
-}
-
 /**
- * @description Builds a markdown table of the findings. Locations link to the
- * file at the given commit when a repository URL is available.
+ * @description A flat markdown table of the findings for the step log, most
+ * severe first.
  */
-export function buildFindingsTable(findings: Finding[], fileUrlBase?: string): string {
-  const rows = sortFindings(findings).map((f) => {
-    const location = `${f.path}:${lines(f)}`;
-    const locationCell = fileUrlBase
-      ? `[${cell(location)}](${fileUrlBase}/${encodeURI(f.path)}#L${f.startLine}${
-          f.endLine !== f.startLine ? `-L${f.endLine}` : ""
-        })`
-      : cell(location);
-    const rule = cell(`${f.violation.engine}:${f.violation.ruleName}`);
-    const message = cell(f.violation.message);
-    return `| ${f.violationType} | ${f.violation.severity} | ${
-      f.violation.url ? `[${rule}](${f.violation.url})` : rule
-    } | ${locationCell} | ${message} |`;
-  });
+export function buildFindingsTable(findings: Finding[]): string {
+  const rows = sortFindings(findings).map(
+    (f) =>
+      `| ${f.violationType} | ${f.violation.severity} | ${formatRule(f)} | ${cell(
+        `${f.path}:${formatLines(f)}`
+      )} | ${cell(f.violation.message)} |`
+  );
   return [
     "| Type | Severity | Rule | Location | Message |",
     "| --- | --- | --- | --- | --- |",
@@ -140,59 +98,36 @@ function annotate(finding: Finding) {
 }
 
 /**
- * @description Reports findings without the GitHub API: a table in the log and
- * the job summary, plus workflow-command annotations, which need no token
- * permissions and still appear on the pull request's changed files.
+ * @description Reports findings without the GitHub API: a table in the step
+ * log, plus workflow-command annotations, which need no token permissions and
+ * still appear on the pull request's changed files.
+ * @returns Notes for the job summary, which lists every finding
  */
-export async function reportWithoutApi(
-  findings: Finding[],
-  reason: string,
-  context: Context
-) {
-  const sha = context.payload?.pull_request?.head?.sha ?? context.sha;
-  const repo = context.payload?.repository?.full_name;
-  const fileUrlBase =
-    repo && sha ? `${context.serverUrl}/${repo}/blob/${sha}` : undefined;
-
-  const heading = `Salesforce Code Analyzer: ${findings.length} violation${
-    findings.length === 1 ? "" : "s"
-  } found`;
-  const note = `Results could not be posted to the pull request. ${reason}`;
-  const table = findings.length ? buildFindingsTable(findings, fileUrlBase) : "";
-
-  console.log(`${heading}\n${note}${table ? `\n\n${buildFindingsTable(findings)}` : ""}`);
+export function reportWithoutApi(findings: Finding[], reason: string): string[] {
+  const notes = [`Results could not be posted to the pull request. ${reason}`];
+  console.log(
+    `Salesforce Code Analyzer: ${plural(findings.length, "violation")} found\n${
+      notes[0]
+    }${findings.length ? `\n\n${buildFindingsTable(findings)}` : ""}`
+  );
 
   const sorted = sortFindings(findings);
-  const omitted: Partial<Record<AnnotationLevel, number>> = {};
+  let omitted = 0;
   for (const level of LEVEL_ORDER) {
     const ofLevel = sorted.filter((f) => f.level === level);
     // Failures also fail the action, and setFailed's message is an error annotation too
     const limit =
       level === "failure" ? MAX_ANNOTATIONS_PER_LEVEL - 1 : MAX_ANNOTATIONS_PER_LEVEL;
     ofLevel.slice(0, limit).forEach(annotate);
-    if (ofLevel.length > limit) {
-      omitted[level] = ofLevel.length - limit;
-    }
+    omitted += Math.max(0, ofLevel.length - limit);
   }
-  const omittedCount = Object.values(omitted).reduce((a, b) => a + (b ?? 0), 0);
-
-  // The summary file only exists on GitHub-hosted and self-hosted runners, not e.g. under `act`
-  if (!process.env.GITHUB_STEP_SUMMARY) {
-    return;
+  if (omitted) {
+    notes.push(
+      `GitHub shows at most ${MAX_ANNOTATIONS_PER_LEVEL} annotations of each level per step, so ${plural(
+        omitted,
+        "finding"
+      )} ${omitted === 1 ? "is" : "are"} only listed below.`
+    );
   }
-  try {
-    await summary
-      .addHeading(heading, 2)
-      .addRaw(note, true)
-      .addRaw(
-        omittedCount
-          ? `\nGitHub shows at most ${MAX_ANNOTATIONS_PER_LEVEL} annotations of each level per step, so ${omittedCount} findings are only listed below.\n`
-          : "",
-        true
-      )
-      .addRaw(table ? `\n${table}\n` : "", true)
-      .write();
-  } catch (e) {
-    console.error("Unable to write the job summary: " + (e as Error).message);
-  }
+  return notes;
 }

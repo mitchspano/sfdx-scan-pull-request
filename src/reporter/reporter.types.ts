@@ -18,7 +18,8 @@ import {
   PluginInputs,
 } from "../common";
 import { ScannerViolation, ScannerViolationType } from "../sfdxCli";
-import { Finding } from "./fallback";
+import { Finding } from "./findings";
+import { writeJobSummary } from "./job-summary";
 import { Context } from "@actions/github/lib/context";
 import { setFailed } from "@actions/core";
 
@@ -78,6 +79,10 @@ export type ReporterProps = {
 export interface Reporter {
   write(): void;
   /**
+   * @description Lists every reported finding in the job summary
+   */
+  writeSummary(): Promise<void>;
+  /**
    * @param anchor Changed lines within the violation, when reporting on a diff
    */
   translateViolationToReport(
@@ -96,11 +101,14 @@ export abstract class BaseReporter<T> implements Reporter {
   protected issues: T[];
   // Every reported violation, for reporting without the API if writes are denied
   protected findings: Finding[];
+  // Extra paragraphs for the job summary, e.g. why results could not be posted
+  protected summaryNotes: string[];
   protected context: Context;
   constructor({ context, inputs }: ReporterProps) {
     this.hasHaltingError = false;
     this.issues = [];
     this.findings = [];
+    this.summaryNotes = [];
     this.context = context;
     this.inputs = inputs;
   }
@@ -115,6 +123,15 @@ export abstract class BaseReporter<T> implements Reporter {
     _anchor?: LineRange
   ): void {
     throw new Error("Method not implemented.");
+  }
+
+  async writeSummary() {
+    await writeJobSummary(
+      this.findings,
+      this.context,
+      this.inputs.target ? `in \`${this.inputs.target}\`` : "on changed lines",
+      this.summaryNotes
+    );
   }
 
   protected recordFinding(

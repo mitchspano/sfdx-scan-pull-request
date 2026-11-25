@@ -94,10 +94,11 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
           if (isPermissionDenied(error)) {
             // Every other write would be denied too, including deletions
             this.checkHasHaltingError();
-            await reportWithoutApi(
-              this.findings,
-              getReadOnlyReason(this.context, "pull-requests"),
-              this.context
+            this.summaryNotes.push(
+              ...reportWithoutApi(
+                this.findings,
+                getReadOnlyReason(this.context, "pull-requests")
+              )
             );
             return;
           }

@@ -137,12 +137,13 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
           "Error when creating check run: " + JSON.stringify(error, null, 2)
         );
         // Any failure would otherwise lose the findings, so report them anyway
-        await reportWithoutApi(
-          this.findings,
-          isPermissionDenied(error)
-            ? getReadOnlyReason(this.context, "checks")
-            : `Creating the check run failed: ${(error as Error).message}`,
-          this.context
+        this.summaryNotes.push(
+          ...reportWithoutApi(
+            this.findings,
+            isPermissionDenied(error)
+              ? getReadOnlyReason(this.context, "checks")
+              : `Creating the check run failed: ${(error as Error).message}`
+          )
         );
       }
     }
