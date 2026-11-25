@@ -11,8 +11,15 @@
    limitations under the License.
  */
 
-import { AnnotationLevel, LineRange, PluginInputs } from "../common";
-import { ScannerViolation } from "../sfdxCli";
+import {
+  AnnotationLevel,
+  getAnnotationLevel,
+  LineRange,
+  PluginInputs,
+} from "../common";
+import { ScannerViolation, ScannerViolationType } from "../sfdxCli";
+import { Finding } from "./findings";
+import { writeJobSummary } from "./job-summary";
 import { Context } from "@actions/github/lib/context";
 import { setFailed } from "@actions/core";
 
@@ -72,6 +79,10 @@ export type ReporterProps = {
 export interface Reporter {
   write(): void;
   /**
+   * @description Lists every reported finding in the job summary
+   */
+  writeSummary(): Promise<void>;
+  /**
    * @param anchor Changed lines within the violation, when reporting on a diff
    */
   translateViolationToReport(
@@ -88,10 +99,16 @@ export abstract class BaseReporter<T> implements Reporter {
   protected hasHaltingError;
   protected inputs: PluginInputs;
   protected issues: T[];
+  // Every reported violation, for reporting without the API if writes are denied
+  protected findings: Finding[];
+  // Extra paragraphs for the job summary, e.g. why results could not be posted
+  protected summaryNotes: string[];
   protected context: Context;
   constructor({ context, inputs }: ReporterProps) {
     this.hasHaltingError = false;
     this.issues = [];
+    this.findings = [];
+    this.summaryNotes = [];
     this.context = context;
     this.inputs = inputs;
   }
@@ -106,6 +123,32 @@ export abstract class BaseReporter<T> implements Reporter {
     _anchor?: LineRange
   ): void {
     throw new Error("Method not implemented.");
+  }
+
+  async writeSummary() {
+    await writeJobSummary(
+      this.findings,
+      this.context,
+      this.inputs.target ? `in \`${this.inputs.target}\`` : "on changed lines",
+      this.summaryNotes
+    );
+  }
+
+  protected recordFinding(
+    path: string,
+    violation: ScannerViolation,
+    violationType: ScannerViolationType
+  ) {
+    const startLine = parseInt(violation.line);
+    const endLine = violation.endLine ? parseInt(violation.endLine) : startLine;
+    this.findings.push({
+      path,
+      startLine,
+      endLine: Math.max(startLine, endLine),
+      level: getAnnotationLevel(violationType, violation.severity),
+      violationType,
+      violation,
+    });
   }
 
   checkHasHaltingError() {

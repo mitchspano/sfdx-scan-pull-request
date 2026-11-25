@@ -25,6 +25,11 @@ import {
   GithubExistingComment,
 } from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
+import {
+  getReadOnlyReason,
+  isPermissionDenied,
+  reportWithoutApi,
+} from "./fallback";
 
 const ERROR = "Error";
 
@@ -86,6 +91,20 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
         try {
           await this.performGithubRequest("POST", comment);
         } catch (error) {
+          if (isPermissionDenied(error)) {
+            // Every other write would be denied too, including deletions
+            this.checkHasHaltingError();
+            this.summaryNotes.push(
+              ...reportWithoutApi(
+                this.findings,
+                `Couldn't post review comments: ${getReadOnlyReason(
+                  this.context,
+                  "pull-requests"
+                )}`
+              )
+            );
+            return;
+          }
           console.error(
             "Error when writing comments: " + JSON.stringify(error, null, 2)
           );
@@ -214,6 +233,7 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
     if (violationType === ERROR) {
       this.hasHaltingError = true;
     }
+    this.recordFinding(filePath, violation, violationType);
     const commit_id = this.context.payload.pull_request
       ? this.context.payload.pull_request.head.sha
       : this.context.sha;

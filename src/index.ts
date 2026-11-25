@@ -17,10 +17,10 @@ import { context } from "@actions/github";
 import { getDiffInPullRequest, GithubPullRequest } from "./git-actions";
 
 import { scanFiles, ScannerFlags, ScannerViolation } from "./sfdxCli";
-import { getChangedLineAnchor, PluginInputs } from "./common";
+import { PluginInputs } from "./common";
+import { filterFindingsToDiffScope } from "./diff-scope";
 import { CommentsReporter } from "./reporter/comments-reporter";
 import { AnnotationsReporter } from "./reporter/annoations-reporter";
-import { Reporter } from "./reporter/reporter.types";
 
 interface ExecSyncError {
   status: string;
@@ -105,42 +105,6 @@ export function performStaticCodeAnalysisOnFilesInDiff(
 }
 
 /**
- * @description Determines which violations are on lines which have changed
- * and passes those to the reporter.
- */
-function filterFindingsToDiffScope(
-  violations: ScannerViolation[],
-  filePathToChangedLines: Map<string, Set<number>>,
-  inputs: PluginInputs,
-  reporter: Reporter
-) {
-  console.log(
-    "Filtering the findings to just the lines which are part of the context..."
-  );
-
-  for (let violation of violations) {
-    const filePath = violation.fileName.replace(process.cwd() + "/", "");
-    if (inputs.target) {
-      reporter.translateViolationToReport(filePath, violation, violation.engine);
-      continue;
-    }
-    // Report when any line of the violation changed in the diff
-    const anchor = getChangedLineAnchor(
-      violation,
-      filePathToChangedLines.get(filePath) || new Set<number>()
-    );
-    if (anchor) {
-      reporter.translateViolationToReport(
-        filePath,
-        violation,
-        violation.engine,
-        anchor
-      );
-    }
-  }
-}
-
-/**
  * @description Constructs an array the files which are to be scanned
  * @param filePathToChangedLines
  * @param target
@@ -203,6 +167,7 @@ async function main() {
     console.error(e);
     setFailed("An error occurred while trying to write to GitHub");
   }
+  await reporter.writeSummary();
 }
 
 main();
