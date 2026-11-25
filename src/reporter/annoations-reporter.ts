@@ -140,9 +140,11 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
         this.summaryNotes.push(
           ...reportWithoutApi(
             this.findings,
-            isPermissionDenied(error)
-              ? getReadOnlyReason(this.context, "checks")
-              : `Creating the check run failed: ${(error as Error).message}`
+            `Couldn't create the check run: ${
+              isPermissionDenied(error)
+                ? getReadOnlyReason(this.context, "checks")
+                : (error as Error).message
+            }`
           )
         );
       }

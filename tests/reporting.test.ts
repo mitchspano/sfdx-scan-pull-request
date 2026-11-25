@@ -69,7 +69,7 @@ describe("isPermissionDenied", () => {
 describe("getReadOnlyReason", () => {
   it("names the fork", () => {
     expect(getReadOnlyReason(forkContext, "checks")).toContain(
-      "from the fork contributor/repo"
+      "pull requests from forks get a read-only token"
     );
   });
 
@@ -78,13 +78,13 @@ describe("getReadOnlyReason", () => {
       actor: "dependabot[bot]",
       payload: { pull_request: { head: { repo: { full_name: "a/b" } }, base: { repo: { full_name: "a/b" } } } },
     } as unknown as Context;
-    expect(getReadOnlyReason(context, "checks")).toContain("Dependabot");
+    expect(getReadOnlyReason(context, "checks")).toBe("Dependabot runs get a read-only token");
   });
 
   it("otherwise asks for the missing permission", () => {
     const context = { actor: "me", payload: {} } as unknown as Context;
     expect(getReadOnlyReason(context, "pull-requests")).toContain(
-      "permissions: pull-requests: write"
+      "the workflow needs `permissions: pull-requests: write`"
     );
   });
 });
@@ -154,7 +154,7 @@ describe("buildJobSummary", () => {
 
 describe("reportWithoutApi", () => {
   it("logs the table and annotates the files", () => {
-    const notes = reportWithoutApi([finding()], "Read-only token.");
+    const notes = reportWithoutApi([finding()], "Couldn't create the check run: read-only");
 
     const log = output.log();
     expect(log).toContain("Salesforce Code Analyzer: 1 violation found");
@@ -162,7 +162,7 @@ describe("reportWithoutApi", () => {
     expect(annotationCommands()).toEqual([
       "::warning title=ApexDoc (sev%3A 4),file=force-app/Foo.cls,line=3,endLine=5::Missing ApexDoc%0Ahttps://example.com/ApexDoc",
     ]);
-    expect(notes).toEqual(["Results could not be posted to the pull request. Read-only token."]);
+    expect(notes).toEqual(["Couldn't create the check run: read-only."]);
   });
 
   it("caps annotations per level and notes how many were left out", () => {
@@ -170,7 +170,7 @@ describe("reportWithoutApi", () => {
       finding({ startLine: i + 1, endLine: i + 1 })
     );
     const failures = many.map((f) => ({ ...f, level: "failure" as const, violationType: "Error" as const }));
-    const notes = reportWithoutApi([...many, ...failures], "Read-only token.");
+    const notes = reportWithoutApi([...many, ...failures], "Couldn't create the check run: read-only");
 
     const commands = annotationCommands();
     expect(commands.filter((c) => c.startsWith("::warning"))).toHaveLength(
@@ -180,7 +180,9 @@ describe("reportWithoutApi", () => {
     expect(commands.filter((c) => c.startsWith("::error"))).toHaveLength(
       MAX_ANNOTATIONS_PER_LEVEL - 1
     );
-    expect(notes[1]).toContain("so 7 findings are only listed below");
+    expect(notes).toEqual([
+      "Couldn't create the check run: read-only. 19 of 26 findings are annotated inline; all are listed below.",
+    ]);
   });
 });
 
@@ -194,7 +196,7 @@ describe("job summary", () => {
     await reporter.writeSummary();
 
     expect(summaryWritten()).toContain("**1 violation** on changed lines in 1 file");
-    expect(summaryWritten()).not.toContain("could not be posted");
+    expect(summaryWritten()).not.toContain("Couldn't");
     expect(annotationCommands()).toHaveLength(0);
   });
 
@@ -266,7 +268,9 @@ describe("reporters on a read-only token", () => {
 
     expect(request).toHaveBeenCalledTimes(1);
     expect(annotationCommands()).toHaveLength(1);
-    expect(summaryWritten()).toContain("from the fork contributor/repo");
+    expect(summaryWritten()).toContain(
+      "Couldn't create the check run: pull requests from forks get a read-only token."
+    );
     expect(summaryWritten()).toContain("<code>force-app/Foo.cls</code>");
   });
 
@@ -295,7 +299,9 @@ describe("reporters on a read-only token", () => {
     expect(String(request.mock.calls[0][0])).toMatch(/^POST /);
     expect(annotationCommands()).toHaveLength(2);
     expect(summaryWritten()).toContain("**2 violations**");
-    expect(summaryWritten()).toContain("from the fork contributor/repo");
+    expect(summaryWritten()).toContain(
+      "Couldn't post review comments: pull requests from forks get a read-only token."
+    );
   });
 
   it("strictly enforced findings still fail the action", async () => {

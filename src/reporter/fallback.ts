@@ -45,19 +45,19 @@ export function isPermissionDenied(err: unknown): boolean {
 
 /**
  * @description Explains why the token could not write, so the user knows
- * whether there is anything to fix.
+ * whether there is anything to fix, e.g. "the workflow needs `permissions: checks: write`".
  */
 export function getReadOnlyReason(context: Context, permission: string): string {
   const pr = context.payload?.pull_request;
   const headRepo = pr?.head?.repo?.full_name;
   const baseRepo = pr?.base?.repo?.full_name;
   if (headRepo && baseRepo && headRepo !== baseRepo) {
-    return `This pull request is from the fork ${headRepo}, so its GITHUB_TOKEN is read-only.`;
+    return "pull requests from forks get a read-only token";
   }
   if (context.actor === "dependabot[bot]") {
-    return "Workflows triggered by Dependabot get a read-only GITHUB_TOKEN.";
+    return "Dependabot runs get a read-only token";
   }
-  return `The GITHUB_TOKEN cannot write. Grant the workflow \`permissions: ${permission}: write\`.`;
+  return `the workflow needs \`permissions: ${permission}: write\``;
 }
 
 /**
@@ -101,15 +101,10 @@ function annotate(finding: Finding) {
  * @description Reports findings without the GitHub API: a table in the step
  * log, plus workflow-command annotations, which need no token permissions and
  * still appear on the pull request's changed files.
- * @returns Notes for the job summary, which lists every finding
+ * @param failure What failed and why, e.g. "Couldn't create the check run: <reason>"
+ * @returns A note for the job summary, which lists every finding
  */
-export function reportWithoutApi(findings: Finding[], reason: string): string[] {
-  const notes = [`Results could not be posted to the pull request. ${reason}`];
-  console.log(
-    `Salesforce Code Analyzer: ${plural(findings.length, "violation")} found\n${
-      notes[0]
-    }${findings.length ? `\n\n${buildFindingsTable(findings)}` : ""}`
-  );
+export function reportWithoutApi(findings: Finding[], failure: string): string[] {
 
   const sorted = sortFindings(findings);
   let omitted = 0;
@@ -121,13 +116,17 @@ export function reportWithoutApi(findings: Finding[], reason: string): string[] 
     ofLevel.slice(0, limit).forEach(annotate);
     omitted += Math.max(0, ofLevel.length - limit);
   }
-  if (omitted) {
-    notes.push(
-      `GitHub shows at most ${MAX_ANNOTATIONS_PER_LEVEL} annotations of each level per step, so ${plural(
-        omitted,
+  // GitHub limits annotations per step, so say how many are inline
+  const note = omitted
+    ? `${failure}. ${findings.length - omitted} of ${plural(
+        findings.length,
         "finding"
-      )} ${omitted === 1 ? "is" : "are"} only listed below.`
-    );
-  }
-  return notes;
+      )} are annotated inline; all are listed below.`
+    : `${failure}.`;
+  console.log(
+    `Salesforce Code Analyzer: ${plural(findings.length, "violation")} found\n${note}${
+      findings.length ? `\n\n${buildFindingsTable(findings)}` : ""
+    }`
+  );
+  return [note];
 }

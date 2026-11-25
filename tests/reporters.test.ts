@@ -144,7 +144,7 @@ describe("CommentsReporter", () => {
     expect(calls("POST")).toHaveLength(2);
     expect(output.errors().join("\n")).toContain("Error when writing comments");
     expect(output.annotations()).toHaveLength(0);
-    expect(output.summary()).not.toContain("could not be posted");
+    expect(output.summary()).not.toContain("Couldn't");
   });
 
   it("still posts when existing comments cannot be fetched", async () => {
@@ -168,7 +168,9 @@ describe("CommentsReporter", () => {
     await reporter.write();
     await reporter.writeSummary();
 
-    expect(output.summary()).toContain("Grant the workflow `permissions: pull-requests: write`");
+    expect(output.summary()).toContain(
+      "Couldn't post review comments: the workflow needs `permissions: pull-requests: write`."
+    );
   });
 });
 
@@ -218,7 +220,7 @@ describe("AnnotationsReporter", () => {
     await reporter.writeSummary();
 
     expect(output.annotations()).toHaveLength(1);
-    expect(output.summary()).toContain("Creating the check run failed: Server Error");
+    expect(output.summary()).toContain("Couldn't create the check run: Server Error.");
   });
 });
 

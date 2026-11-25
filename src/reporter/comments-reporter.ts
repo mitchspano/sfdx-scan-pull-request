@@ -97,7 +97,10 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
             this.summaryNotes.push(
               ...reportWithoutApi(
                 this.findings,
-                getReadOnlyReason(this.context, "pull-requests")
+                `Couldn't post review comments: ${getReadOnlyReason(
+                  this.context,
+                  "pull-requests"
+                )}`
               )
             );
             return;
