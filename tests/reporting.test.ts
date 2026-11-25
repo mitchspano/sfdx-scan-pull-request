@@ -13,6 +13,7 @@ jest.mock("@actions/github", () => ({
 
 import {
   buildFindingsTable,
+  describeError,
   getReadOnlyReason,
   isPermissionDenied,
   MAX_ANNOTATIONS_PER_LEVEL,
@@ -63,6 +64,17 @@ describe("isPermissionDenied", () => {
     ).toBe(false);
     expect(isPermissionDenied({ status: 422, message: "Validation Failed" })).toBe(false);
     expect(isPermissionDenied(undefined)).toBe(false);
+  });
+});
+
+describe("describeError", () => {
+  it("gives the status and message without the request", () => {
+    const error = Object.assign(new Error("Resource not accessible by integration"), {
+      status: 403,
+      request: { body: "x".repeat(10000) },
+    });
+    expect(describeError(error)).toBe("403 Resource not accessible by integration");
+    expect(describeError("boom")).toBe("boom");
   });
 });
 

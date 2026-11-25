@@ -11,11 +11,7 @@
    limitations under the License.
  */
 
-import {
-  getGithubFilePath,
-  getScannerViolationType,
-  LineRange,
-} from "../common";
+import { getGithubFilePath, LineRange } from "../common";
 
 import { Octokit } from "@octokit/action";
 import { context } from "@actions/github";
@@ -25,13 +21,7 @@ import {
   GithubExistingComment,
 } from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
-import {
-  getReadOnlyReason,
-  isPermissionDenied,
-  reportWithoutApi,
-} from "./fallback";
-
-const ERROR = "Error";
+import { describeError, isPermissionDenied } from "./fallback";
 
 const HIDDEN_COMMENT_PREFIX = "<!--sfdx-scanner-->";
 
@@ -75,46 +65,35 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
     await octokit.request(endpoint);
   }
 
+  protected readonly writeAction = "post review comments";
+  protected readonly writePermission = "pull-requests";
+
   /**
-   * @description Writes the relevant comments to the GitHub pull request.
-   * Uses the octokit to post the comments to the PR.
+   * @description Posts new comments, skipping ones already on the pull
+   * request, then deletes resolved comments if enabled. A denied write is
+   * rethrown: every other write would be denied too.
    */
-  async write() {
+  protected async post() {
     console.log("Writing comments using GitHub REST API...");
     const existingComments = await this.getExistingComments();
 
-    for (let comment of this.issues) {
+    for (const comment of this.issues) {
       const existingComment = existingComments.find((existingComment) =>
         this.matchComment(comment, existingComment)
       );
-      if (!existingComment) {
-        try {
-          await this.performGithubRequest("POST", comment);
-        } catch (error) {
-          if (isPermissionDenied(error)) {
-            // Every other write would be denied too, including deletions
-            this.checkHasHaltingError();
-            this.summaryNotes.push(
-              ...reportWithoutApi(
-                this.findings,
-                `Couldn't post review comments: ${getReadOnlyReason(
-                  this.context,
-                  "pull-requests"
-                )}`
-              )
-            );
-            return;
-          }
-          console.error(
-            "Error when writing comments: " + JSON.stringify(error, null, 2)
-          );
-        }
-      } else {
+      if (existingComment) {
         console.log(`Skipping existing comment ${existingComment.url}`);
+        continue;
+      }
+      try {
+        await this.performGithubRequest("POST", comment);
+      } catch (error) {
+        if (isPermissionDenied(error)) {
+          throw error;
+        }
+        console.error(`Error when writing comments: ${describeError(error)}`);
       }
     }
-
-    this.checkHasHaltingError();
 
     if (this.inputs.deleteResolvedComments) {
       await this.deleteResolvedComments(this.issues, existingComments);
@@ -146,7 +125,14 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
           `Removing the comment because the issue appears to be resolved: Id: ${comment.id}, File: ${comment?.path}, Body: ${comment.body}`
         );
         // This shouldn't use Promise.all() or there may be issues with GH API limits
-        await this.performGithubDeleteRequest(comment);
+        try {
+          await this.performGithubDeleteRequest(comment);
+        } catch (error) {
+          if (isPermissionDenied(error)) {
+            throw error;
+          }
+          console.error(`Error when deleting a comment: ${describeError(error)}`);
+        }
       }
     }
   }
@@ -167,10 +153,7 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
           comment.user.type === "Bot"
       );
     } catch (error) {
-      console.error(
-        "Error when fetching existing comments: " +
-          JSON.stringify(error, null, 2)
-      );
+      console.error(`Error when fetching existing comments: ${describeError(error)}`);
     }
     return result;
   }
@@ -225,18 +208,8 @@ export class CommentsReporter extends BaseReporter<GithubComment> {
       }
     }
 
-    const violationType = getScannerViolationType(
-      this.inputs,
-      violation,
-      engine
-    );
-    if (violationType === ERROR) {
-      this.hasHaltingError = true;
-    }
-    this.recordFinding(filePath, violation, violationType);
-    const commit_id = this.context.payload.pull_request
-      ? this.context.payload.pull_request.head.sha
-      : this.context.sha;
+    const violationType = this.classifyViolation(filePath, violation, engine);
+    const commit_id = this.commitId;
 
     this.issues.push({
       commit_id,

@@ -159,6 +159,24 @@ describe("CommentsReporter", () => {
     expect(output.errors().join("\n")).toContain("Error when fetching existing comments");
   });
 
+  it("logs a failed delete and keeps deleting", async () => {
+    paginate.mockResolvedValue([
+      existingCommentFor(violation({ line: "20", endLine: "20" }), { start: 20, end: 20 }, 2),
+      existingCommentFor(violation({ line: "30", endLine: "30" }), { start: 30, end: 30 }, 3),
+    ]);
+    request
+      .mockRejectedValueOnce(Object.assign(new Error("Server Error"), { status: 500 }))
+      .mockResolvedValue({});
+    const reporter = commentsReporter();
+
+    await reporter.write();
+    await reporter.writeSummary();
+
+    expect(calls("DELETE")).toHaveLength(2);
+    expect(output.errors()).toContain("Error when deleting a comment: 500 Server Error");
+    expect(output.summary()).not.toContain("Couldn't");
+  });
+
   it("asks for pull-requests: write when a same-repo comment is denied", async () => {
     paginate.mockResolvedValue([]);
     request.mockRejectedValue(permissionError);
@@ -221,6 +239,8 @@ describe("AnnotationsReporter", () => {
 
     expect(output.annotations()).toHaveLength(1);
     expect(output.summary()).toContain("Couldn't create the check run: Server Error.");
+    // One line, not the request with every annotation
+    expect(output.errors()).toEqual(["GitHub request failed: 500 Server Error"]);
   });
 });
 
