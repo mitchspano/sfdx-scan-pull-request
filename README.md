@@ -33,6 +33,9 @@ engines:
       - category/apex/my-rules.xml
   eslint:
     eslint_config_file: .eslintrc.json
+ignores:
+  files: # globs for files that are never scanned
+    - "**/staticresources/**"
 ```
 
 Custom rules are tagged `Recommended` and `Custom`, so the default `rule-selector` includes them. To change a rule's severity or tags, use the `rules` section of the config file.
@@ -70,7 +73,7 @@ When set to true, will delete resolved comments from a PR. Defaults to `false`. 
 
 ## Example usage
 
-The workflow token needs `pull-requests: write` for `comments` mode, or `checks: write` for `check-runs` mode. `fetch-depth: 0` is required so the action can compute the PR diff.
+The workflow token needs `pull-requests: write` for `comments` mode, or `checks: write` for `check-runs` mode. `fetch-depth: 0` is recommended. With a shallow checkout, the action fetches the PR's base and head commits itself to compute the diff.
 
 ```
 name: Static Analysis
@@ -107,11 +110,15 @@ jobs:
 
 Code Analyzer requires Java 11+ (PMD) and Python 3.10+ (Flow engine); both are preinstalled on `ubuntu-latest`.
 
+### Job summary
+
+Every run writes its findings to the workflow run's job summary, in a collapsible section per file. Line numbers link to the file at the PR's head commit. On a pull request it lists the same findings as the check run or comments: only violations that span a changed line. With `target`, it lists every finding in the target.
+
 ### Pull requests from forks
 
 Pull requests from forks (and from Dependabot) get a read-only `GITHUB_TOKEN`, so the action cannot create check runs or comments. When GitHub denies the write, the action reports the findings without the API instead:
 
-- a table of every finding in the step log and the workflow run's job summary
+- a table of every finding in the step log, plus the job summary, which notes why the findings couldn't be posted
 - annotations on the pull request's changed files, up to 10 per level (GitHub's per-step limit)
 
 Strictly enforced findings and findings at or above `severity-threshold` still fail the action.
