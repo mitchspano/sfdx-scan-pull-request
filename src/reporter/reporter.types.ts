@@ -14,12 +14,19 @@
 import {
   AnnotationLevel,
   getAnnotationLevel,
+  getScannerViolationType,
   LineRange,
   PluginInputs,
 } from "../common";
 import { ScannerViolation, ScannerViolationType } from "../sfdxCli";
 import { Finding } from "./findings";
 import { writeJobSummary } from "./job-summary";
+import {
+  describeError,
+  getReadOnlyReason,
+  isPermissionDenied,
+  reportWithoutApi,
+} from "./fallback";
 import { Context } from "@actions/github/lib/context";
 import { setFailed } from "@actions/core";
 
@@ -77,7 +84,7 @@ export type ReporterProps = {
 };
 
 export interface Reporter {
-  write(): void;
+  write(): Promise<void>;
   /**
    * @description Lists every reported finding in the job summary
    */
@@ -113,16 +120,65 @@ export abstract class BaseReporter<T> implements Reporter {
     this.inputs = inputs;
   }
 
-  write(): void {
-    throw new Error("Method not implemented.");
+  // What write() does, for messages, e.g. "create the check run"
+  protected abstract readonly writeAction: string;
+  // The token permission write() needs, e.g. "checks"
+  protected abstract readonly writePermission: string;
+
+  /**
+   * @description Sends the issues to GitHub. Throws when the findings would
+   * otherwise be lost, e.g. when the token cannot write.
+   */
+  protected abstract post(): Promise<void>;
+
+  abstract translateViolationToReport(
+    filePath: string,
+    violation: ScannerViolation,
+    engine: string,
+    anchor?: LineRange
+  ): void;
+
+  /**
+   * @description Fails the action for blocking findings, then posts the
+   * issues. If posting fails, reports the findings without the API instead.
+   */
+  async write() {
+    this.checkHasHaltingError();
+    try {
+      await this.post();
+    } catch (error) {
+      console.error(`GitHub request failed: ${describeError(error)}`);
+      const reason = isPermissionDenied(error)
+        ? getReadOnlyReason(this.context, this.writePermission)
+        : (error as Error).message;
+      this.summaryNotes.push(
+        ...reportWithoutApi(this.findings, `Couldn't ${this.writeAction}: ${reason}`)
+      );
+    }
   }
-  translateViolationToReport(
-    _filePath: string,
-    _violation: ScannerViolation,
-    _engine: string,
-    _anchor?: LineRange
-  ): void {
-    throw new Error("Method not implemented.");
+
+  /**
+   * @description Classifies a violation as an error or warning, records it
+   * for the job summary, and marks the run as failing for errors.
+   */
+  protected classifyViolation(
+    filePath: string,
+    violation: ScannerViolation,
+    engine: string
+  ): ScannerViolationType {
+    const violationType = getScannerViolationType(this.inputs, violation, engine);
+    if (violationType === "Error") {
+      this.hasHaltingError = true;
+    }
+    this.recordFinding(filePath, violation, violationType);
+    return violationType;
+  }
+
+  // The commit the findings are reported on: the PR head, or the pushed commit
+  protected get commitId(): string {
+    return this.context.payload?.pull_request
+      ? this.context.payload.pull_request.head.sha
+      : this.context.sha;
   }
 
   async writeSummary() {
@@ -134,7 +190,7 @@ export abstract class BaseReporter<T> implements Reporter {
     );
   }
 
-  protected recordFinding(
+  private recordFinding(
     path: string,
     violation: ScannerViolation,
     violationType: ScannerViolationType

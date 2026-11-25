@@ -44,6 +44,15 @@ export function isPermissionDenied(err: unknown): boolean {
 }
 
 /**
+ * @description One line for the log, e.g. "403 Resource not accessible by
+ * integration", instead of the error's full request and response.
+ */
+export function describeError(err: unknown): string {
+  const e = err as { status?: number; message?: string };
+  return [e?.status, e?.message ?? String(err)].filter(Boolean).join(" ");
+}
+
+/**
  * @description Explains why the token could not write, so the user knows
  * whether there is anything to fix, e.g. "the workflow needs `permissions: checks: write`".
  */

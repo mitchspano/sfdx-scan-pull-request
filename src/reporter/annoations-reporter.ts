@@ -11,7 +11,7 @@
    limitations under the License.
  */
 
-import { getAnnotationLevel, getScannerViolationType } from "../common";
+import { getAnnotationLevel } from "../common";
 import { Octokit } from "@octokit/action";
 import { context } from "@actions/github";
 import {
@@ -20,13 +20,7 @@ import {
   GithubCheckRun,
 } from "./reporter.types";
 import { ScannerViolation } from "../sfdxCli";
-import {
-  getReadOnlyReason,
-  isPermissionDenied,
-  reportWithoutApi,
-} from "./fallback";
 
-export const ERROR = "Error";
 export const RIGHT = "RIGHT";
 // GitHub accepts at most 50 annotations per check-run request
 const MAX_ANNOTATIONS_PER_REQUEST = 50;
@@ -98,57 +92,31 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
     }
   }
 
-  /**
-   * @description Writes the Check Run to GitHub
-   */
-  async write() {
-    console.log("Creating Check Runs using GitHub REST API...");
+  protected readonly writeAction = "create the check run";
+  protected readonly writePermission = "checks";
 
-    let conclusion: "failure" | "success" | "neutral";
+  /**
+   * @description Creates the Check Run with all annotations
+   */
+  protected async post() {
+    console.log("Creating Check Runs using GitHub REST API...");
+    let conclusion: GithubCheckRun["conclusion"];
     if (this.hasHaltingError) {
       conclusion = "failure";
     } else {
       conclusion = this.issues.length === 0 ? "success" : "neutral";
     }
-
-    const commit_id = this.context.payload?.pull_request
-      ? this.context.payload.pull_request.head.sha
-      : this.context.sha;
-
-    if (this.issues) {
-      const request: GithubCheckRun = {
-        name: "sfdx-scanner",
-        head_sha: commit_id,
-        status: "completed",
-        conclusion: conclusion,
-        output: {
-          title: "Results from Salesforce Code Analyzer",
-          summary: `${this.issues.length} violations found`,
-          annotations: this.issues,
-        },
-      };
-
-      this.checkHasHaltingError();
-
-      try {
-        await this.performGithubRequest(request);
-      } catch (error) {
-        console.error(
-          "Error when creating check run: " + JSON.stringify(error, null, 2)
-        );
-        // Any failure would otherwise lose the findings, so report them anyway
-        this.summaryNotes.push(
-          ...reportWithoutApi(
-            this.findings,
-            `Couldn't create the check run: ${
-              isPermissionDenied(error)
-                ? getReadOnlyReason(this.context, "checks")
-                : (error as Error).message
-            }`
-          )
-        );
-      }
-    }
+    await this.performGithubRequest({
+      name: "sfdx-scanner",
+      head_sha: this.commitId,
+      status: "completed",
+      conclusion,
+      output: {
+        title: "Results from Salesforce Code Analyzer",
+        summary: `${this.issues.length} violations found`,
+        annotations: this.issues,
+      },
+    });
   }
 
   /**
@@ -163,15 +131,7 @@ export class AnnotationsReporter extends BaseReporter<GithubAnnotation> {
     violation: ScannerViolation,
     engine: string
   ) {
-    const violationType = getScannerViolationType(
-      this.inputs,
-      violation,
-      engine
-    );
-    if (violationType === ERROR) {
-      this.hasHaltingError = true;
-    }
-    this.recordFinding(filePath, violation, violationType);
+    const violationType = this.classifyViolation(filePath, violation, engine);
     let endLine = violation.endLine
       ? parseInt(violation.endLine)
       : parseInt(violation.line);
