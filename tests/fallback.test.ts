@@ -216,19 +216,19 @@ describe("reportWithoutApi", () => {
     const many = Array.from({ length: MAX_ANNOTATIONS_PER_LEVEL + 3 }, (_, i) =>
       finding({ startLine: i + 1, endLine: i + 1 })
     );
-    await reportWithoutApi(
-      [...many, finding({ level: "failure", violationType: "Error" })],
-      "Read-only token.",
-      forkContext
-    );
+    const failures = many.map((f) => ({ ...f, level: "failure" as const, violationType: "Error" as const }));
+    await reportWithoutApi([...many, ...failures], "Read-only token.", forkContext);
 
     const commands = annotationCommands();
     expect(commands.filter((c) => c.startsWith("::warning"))).toHaveLength(
       MAX_ANNOTATIONS_PER_LEVEL
     );
-    expect(commands.filter((c) => c.startsWith("::error"))).toHaveLength(1);
+    // One error slot is left for the action's own setFailed message
+    expect(commands.filter((c) => c.startsWith("::error"))).toHaveLength(
+      MAX_ANNOTATIONS_PER_LEVEL - 1
+    );
     const written = readFileSync(summaryFile, "utf8");
-    expect(written).toContain("3 more are listed below");
+    expect(written).toContain("so 7 findings are only listed below");
     expect(written.match(/^\| Warning /gm)).toHaveLength(MAX_ANNOTATIONS_PER_LEVEL + 3);
   });
 

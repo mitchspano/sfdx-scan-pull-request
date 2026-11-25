@@ -166,9 +166,12 @@ export async function reportWithoutApi(
   const omitted: Partial<Record<AnnotationLevel, number>> = {};
   for (const level of LEVEL_ORDER) {
     const ofLevel = sorted.filter((f) => f.level === level);
-    ofLevel.slice(0, MAX_ANNOTATIONS_PER_LEVEL).forEach(annotate);
-    if (ofLevel.length > MAX_ANNOTATIONS_PER_LEVEL) {
-      omitted[level] = ofLevel.length - MAX_ANNOTATIONS_PER_LEVEL;
+    // Failures also fail the action, and setFailed's message is an error annotation too
+    const limit =
+      level === "failure" ? MAX_ANNOTATIONS_PER_LEVEL - 1 : MAX_ANNOTATIONS_PER_LEVEL;
+    ofLevel.slice(0, limit).forEach(annotate);
+    if (ofLevel.length > limit) {
+      omitted[level] = ofLevel.length - limit;
     }
   }
   const omittedCount = Object.values(omitted).reduce((a, b) => a + (b ?? 0), 0);
@@ -183,7 +186,7 @@ export async function reportWithoutApi(
       .addRaw(note, true)
       .addRaw(
         omittedCount
-          ? `\nOnly the first ${MAX_ANNOTATIONS_PER_LEVEL} findings of each level are annotated on the changed files; ${omittedCount} more are listed below.\n`
+          ? `\nGitHub shows at most ${MAX_ANNOTATIONS_PER_LEVEL} annotations of each level per step, so ${omittedCount} findings are only listed below.\n`
           : "",
         true
       )
